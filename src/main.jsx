@@ -1,17 +1,15 @@
+// src/main.jsx
+// Este archivo arranca tu aplicación React Router + IPTVApp
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import App from './App';
-import { AuthProvider } from './utils/AuthContext';
-import { PrivateRoute } from './utils/PrivateRoute';
-import './index.css';
+import { AuthProvider } from './utils/AuthContext.jsx';
+import { PrivateRoute } from './utils/PrivateRoute.jsx';
+import IPTVApp from './IPTVApp.jsx';
+import { Login } from './pages/Login.jsx';
+import { Register } from './pages/Register.jsx';
 
-import { Home } from './pages/Home';
-import { Movies } from './pages/Movies';
-import { Series } from './pages/Series';
-import { Player } from './pages/Player';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -22,13 +20,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Rutas privadas (protegidas) */}
-          <Route path="/" element={<App />}>
-            <Route index element={<Home />} />
-            <Route path="movies" element={<PrivateRoute><Movies /></PrivateRoute>} />
-            <Route path="series" element={<PrivateRoute><Series /></PrivateRoute>} />
-            <Route path="player/:id" element={<PrivateRoute><Player /></PrivateRoute>} />
-          </Route>
+          {/* Ruta principal IPTV, protegida */}
+          <Route
+            path="/*"
+            element={
+              <PrivateRoute>
+                <IPTVApp />
+              </PrivateRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
