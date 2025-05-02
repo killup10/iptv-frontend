@@ -16,9 +16,9 @@ export function Login() {
 
     try {
       const deviceId = navigator.userAgent;
-      const { token } = await loginService(username, password, deviceId);
+      const { token, role } = await loginService(username, password, deviceId);
       localStorage.setItem("token", token);
-      login({ username, token });
+      login({ username, token, role }); // ahora guarda también el rol
       navigate("/");
     } catch (err) {
       setError(err.message);
