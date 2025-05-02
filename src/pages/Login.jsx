@@ -17,7 +17,6 @@ export function Login() {
 
     try {
       const deviceId = navigator.userAgent;
-      # Antes tenías guiones en estas líneas, los quitamos y adaptamos:
       const { token, role } = await loginService(username, password, deviceId);
       localStorage.setItem("token", token);
       login({ username, token, role });
