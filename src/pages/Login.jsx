@@ -1,62 +1,73 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../utils/AuthService"; // 👈 Importamos el servicio
+import { login as loginService } from "../services/AuthService.js";  // Ajusta ruta si tu archivo está en /src/services
+import { useAuth } from "../utils/AuthContext.jsx";
 
-export const Login = () => {
+export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();    // <-- traemos la función de contexto
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
-      const data = await login(username, password); // 👈 Usamos el servicio
-      localStorage.setItem("token", data.token);
-      navigate("/catalogo");
+      const deviceId = navigator.userAgent;
+      // Llamamos al servicio que hace el fetch al backend
+      const { token } = await loginService(username, password, deviceId);
+
+      // 1) guardamos el token en localStorage (para usarlo en peticiones)
+      localStorage.setItem("token", token);
+
+      // 2) actualizamos el contexto de Auth con algún dato de usuario
+      login({ username, token });
+
+      // 3) redirigimos a la ruta privada principal ("/")
+      navigate("/");
     } catch (err) {
-      setError(err.response?.data?.error || "Error al iniciar sesión");
+      // err.message ya contiene el texto que lanzamos en AuthService
+      setError(err.message);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Iniciar Sesión</h2>
-        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required
-          />
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition"
-          >
-            Entrar
-          </button>
-        </form>
-        <p className="mt-4 text-center">
+      <form onSubmit={handleLogin} className="bg-white p-8 rounded shadow-md w-full max-w-sm">
+        <h2 className="text-2xl font-bold mb-6 text-center">Iniciar sesión</h2>
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+        <input
+          type="text"
+          placeholder="Usuario"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          className="w-full p-2 mb-4 border rounded"
+          required
+        />
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          className="w-full p-2 mb-4 border rounded"
+          required
+        />
+
+        <button
+          type="submit"
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded"
+        >
+          Entrar
+        </button>
+
+        <p className="mt-4 text-center text-sm">
           ¿No tienes cuenta?{" "}
-          <a href="/register" className="text-blue-600 hover:underline">
-            Regístrate
-          </a>
+          <a href="/register" className="text-blue-500 hover:underline">Regístrate</a>
         </p>
-      </div>
+      </form>
     </div>
   );
-};
+}

@@ -1,39 +1,24 @@
-const API_URL = "https://iptv-backend-w6hf.onrender.com";
+// src/services/AuthService.js
+const API_URL = import.meta.env.VITE_API_URL;
 
-async function login(username, password, deviceId) {
+export async function login(username, password, deviceId) {
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password, deviceId }),
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Error en login: ${text}`);
-  }
-
   const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error en login");
   return data;
 }
 
-async function register(username, password) {
+export async function register(username, password) {
   const response = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Error en registro: ${text}`);
-  }
-
   const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error en registro");
   return data;
 }
-
-export { login, register };
