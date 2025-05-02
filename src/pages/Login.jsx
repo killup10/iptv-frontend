@@ -1,3 +1,4 @@
+cat << 'EOF' > src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login as loginService } from "../services/AuthService.js";
@@ -16,14 +17,10 @@ export function Login() {
 
     try {
       const deviceId = navigator.userAgent;
--      const { token } = await loginService(username, password, deviceId);
--      localStorage.setItem("token", token);
--      login({ username, token });
-+      // loginService ahora retorna { token, role }
-+      const { token, role } = await loginService(username, password, deviceId);
-+      localStorage.setItem("token", token);
-+      // Guardar usuario con role en el Context, sin tocar el resto del JSX
-+      login({ username, token, role });
+      # Antes tenías guiones en estas líneas, los quitamos y adaptamos:
+      const { token, role } = await loginService(username, password, deviceId);
+      localStorage.setItem("token", token);
+      login({ username, token, role });
       navigate("/");
     } catch (err) {
       setError(err.message);
@@ -78,3 +75,6 @@ export function Login() {
     </div>
   );
 }
+
+export default Login;
+EOF
