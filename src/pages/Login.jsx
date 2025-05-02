@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login as loginService } from "../services/AuthService.js";  // Ajusta ruta si tu archivo está en /src/services
+import { login as loginService } from "../services/AuthService.js";
 import { useAuth } from "../utils/AuthContext.jsx";
 
 export function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]     = useState("");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login } = useAuth();    // <-- traemos la función de contexto
+  const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -16,58 +16,60 @@ export function Login() {
 
     try {
       const deviceId = navigator.userAgent;
-      // Llamamos al servicio que hace el fetch al backend
       const { token } = await loginService(username, password, deviceId);
-
-      // 1) guardamos el token en localStorage (para usarlo en peticiones)
       localStorage.setItem("token", token);
-
-      // 2) actualizamos el contexto de Auth con algún dato de usuario
       login({ username, token });
-
-      // 3) redirigimos a la ruta privada principal ("/")
       navigate("/");
     } catch (err) {
-      // err.message ya contiene el texto que lanzamos en AuthService
       setError(err.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleLogin} className="bg-white p-8 rounded shadow-md w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-6 text-center">Iniciar sesión</h2>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
+      <div className="bg-[#1e1e2f] p-8 rounded-2xl shadow-xl w-full max-w-md text-white">
+        <h2 className="text-3xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+          <span className="text-blue-500 text-4xl">▶</span> TeamG <span className="text-purple-500">Play</span>
+        </h2>
 
-        <input
-          type="text"
-          placeholder="Usuario"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          className="w-full p-2 mb-4 border rounded"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          className="w-full p-2 mb-4 border rounded"
-          required
-        />
+        {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
 
-        <button
-          type="submit"
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded"
-        >
-          Entrar
-        </button>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm mb-1">Usuario</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full px-4 py-2 rounded bg-[#2c2c3c] border border-gray-600 focus:outline-none focus:border-blue-500"
+              placeholder="Ingresa tu usuario"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-4 py-2 rounded bg-[#2c2c3c] border border-gray-600 focus:outline-none focus:border-purple-500"
+              placeholder="Tu contraseña"
+              required
+            />
+          </div>
 
-        <p className="mt-4 text-center text-sm">
-          ¿No tienes cuenta?{" "}
-          <a href="/register" className="text-blue-500 hover:underline">Regístrate</a>
+          <button
+            type="submit"
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white py-2 rounded-lg font-semibold transition"
+          >
+            Iniciar sesión
+          </button>
+        </form>
+
+        <p className="text-center text-sm mt-6 text-gray-400">
+          ¿No tienes cuenta? <span className="text-blue-400">Contacta con el administrador</span>
         </p>
-      </form>
+      </div>
     </div>
   );
 }
