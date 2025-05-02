@@ -31,11 +31,12 @@ export default function IPTVApp() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
-      <h1 className="text-3xl font-bold mb-4 text-center">IPTV Streaming</h1>
+      <h1 className="text-3xl font-bold mb-4 text-center">TeamG Play</h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <Tab value="live" label="Canales en Vivo" />
-        <Tab value="vod" label="Películas / Series" />
+        <Tab value="vod" label="Películas" />
+        <Tab value="vod" label="series" />
       </Tabs>
 
       <Input
