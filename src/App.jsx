@@ -40,8 +40,10 @@ function AppContent() {
           <Route path="/player/:id" element={<PrivateRoute><Player/></PrivateRoute>} />
           <Route path="/iptv" element={<PrivateRoute><IPTVApp/></PrivateRoute>} />
 
+          {/* Ruta /admin protegida solo para admins */}
           <Route path="/admin" element={<AdminRoute><AdminPanel/></AdminRoute>} />
 
+          {/* Fallback */}
           <Route path="*" element={<PrivateRoute><Catalog/></PrivateRoute>} />
         </Routes>
       </main>
