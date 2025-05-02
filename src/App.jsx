@@ -1,5 +1,6 @@
+cat << 'EOF' > src/App.jsx
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { AuthProvider } from "./utils/AuthContext.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import { Login } from "./pages/Login.jsx";
@@ -18,10 +19,11 @@ export const App = () => {
             <div className="max-w-6xl mx-auto px-4 flex justify-between items-center">
               <h1 className="text-2xl font-bold">TeamG Play</h1>
               <nav className="space-x-4">
-                <a href="/" className="hover:underline">Home</a>
-                <a href="/movies" className="hover:underline">Movies</a>
-                <a href="/series" className="hover:underline">Series</a>
-                <a href="/admin" className="hover:underline">Admin</a>
+                <Link to="/" className="hover:underline">Home</Link>
+                <Link to="/movies" className="hover:underline">Movies</Link>
+                <Link to="/series" className="hover:underline">Series</Link>
+                <Link to="/iptv" className="hover:underline">IPTV</Link>
+                <Link to="/admin" className="hover:underline">Admin</Link>
               </nav>
             </div>
           </header>
@@ -98,3 +100,4 @@ export const App = () => {
 };
 
 export default App;
+EOF
