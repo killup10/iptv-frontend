@@ -5,15 +5,17 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
+  // Al montar, cargo user desde localStorage (si existe)
   useEffect(() => {
-    console.log("AuthProvider montado");
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      setUser(JSON.parse(stored));
     }
   }, []);
 
+  // Esta función la llamaremos desde Login.jsx
   const login = (userData) => {
+    // Guardamos en localStorage para persistir tras refresh
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
   };
@@ -30,5 +32,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Hook personalizado para usar Auth
+// Hook para consumir el contexto
 export const useAuth = () => useContext(AuthContext);
