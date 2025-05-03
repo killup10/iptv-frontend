@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
-import { Tabs, Tab } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
+import { Tabs } from '../components/ui/tabs.jsx';
+import { Tab } from '../components/ui/tab.jsx';
+import { Input } from '../components/ui/input.jsx';
 
 export default function IPTVApp() {
   const [m3uFiles, setM3uFiles] = useState([]);
@@ -36,7 +37,7 @@ export default function IPTVApp() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <Tab value="live" label="Canales en Vivo" />
         <Tab value="vod" label="Películas" />
-        <Tab value="vod" label="series" />
+        <Tab value="vod" label="Series" />
       </Tabs>
 
       <Input
@@ -84,10 +85,4 @@ export default function IPTVApp() {
         </div>
       )}
     </div>
-  );
-}
-
-/*
-In src/main.jsx ensure you import IPTVApp instead of App:
-import IPTVApp from './IPTVApp.jsx';
-*/
+]
