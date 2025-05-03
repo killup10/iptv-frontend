@@ -8,7 +8,7 @@ import AdminRoute from './components/AdminRoute.jsx';
 
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import Catalog from './pages/Catalog';
+import Catalog from './pages/Catalogo';
 import Player from './pages/Player';
 import IPTVApp from './pages/IPTVApp';
 import AdminPanel from './pages/AdminPanel';
