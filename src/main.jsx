@@ -7,7 +7,7 @@ import AdminRoute from './components/AdminRoute.jsx';
 
 import { Login } from './pages/Login.jsx';
 import { Register } from './pages/Register.jsx';
-import Catalogo from './pages/Catalogo.jsx';
+import { Catalogo } from './pages/Catalogo.jsx';
 import Player from './pages/Player.jsx';
 import IPTVApp      from './IPTVApp.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
