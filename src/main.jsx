@@ -10,7 +10,7 @@ import { Register } from './pages/Register.jsx';
 import { Catalogo } from './pages/Catalogo.jsx';
 import { Player } from './pages/Player.jsx';
 import IPTVApp      from './IPTVApp.jsx';
-import { AdminPanel } from './pages/AdminPanel.jsx';
+import AdminPanel from './pages/AdminPanel.jsx';
 import './index.css';
 
 const container = document.getElementById('root');
