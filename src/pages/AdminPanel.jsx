@@ -1,10 +1,10 @@
+// src/pages/AdminPanel.jsx
 import React, { useState } from "react";
-import { useAuth } from "../utils/AuthContext";
-import { Input } from "../components/ui/input";
-import { Button } from "../components/ui/button";
+import { useAuth } from "../utils/AuthContext.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Button } from "../components/ui/button.jsx";
 
-
-export function AdminPanel() {
+export default function AdminPanel() {
   const { user } = useAuth();
   const [m3uName, setM3uName] = useState("");
   const [m3uContent, setM3uContent] = useState("");
@@ -13,7 +13,6 @@ export function AdminPanel() {
   const [msg, setMsg] = useState("");
 
   const API = import.meta.env.VITE_API_URL;
-
   const authHeader = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
   const submitM3u = async e => {
@@ -45,7 +44,7 @@ export function AdminPanel() {
       <h1 className="text-2xl font-bold">Panel Admin</h1>
       {msg && <div className="p-2 bg-green-200">{msg}</div>}
 
-      <form onSubmit={submitM3u} className="space-y-2">
+      <form onSubmit={submitM3u} className="space-y-4">
         <h2 className="font-semibold">Subir lista M3U</h2>
         <Input
           placeholder="Nombre de archivo (e.g. canales.m3u)"
@@ -55,14 +54,15 @@ export function AdminPanel() {
         <textarea
           rows="6"
           className="w-full p-2 border rounded"
-          placeholder="#EXTM3U\n..."
+          placeholder="#EXTM3U
+..."
           value={m3uContent}
           onChange={e => setM3uContent(e.target.value)}
         />
         <Button type="submit">Subir M3U</Button>
       </form>
 
-      <form onSubmit={submitVideo} className="space-y-2">
+      <form onSubmit={submitVideo} className="space-y-4">
         <h2 className="font-semibold">Agregar Vídeo VOD</h2>
         <Input
           placeholder="Título de la película/serie"
@@ -74,7 +74,7 @@ export function AdminPanel() {
           value={videoUrl}
           onChange={e => setVideoUrl(e.target.value)}
         />
-        <Button type="submit">Agregar Vídeo</Button>
+        <Button type="submit" className="bg-green-600 hover:bg-green-700">Agregar Vídeo</Button>
       </form>
     </div>
   );
