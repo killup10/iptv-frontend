@@ -1,8 +1,7 @@
-cat << 'EOF' > src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login as loginService } from "../services/AuthService.js";
-import { useAuth } from "../utils/AuthContext.jsx";
+import { login as loginService } from "../services/AuthService";
+import { useAuth } from "../utils/AuthContext";
 
 export function Login() {
   const [username, setUsername] = useState("");
@@ -76,4 +75,3 @@ export function Login() {
 }
 
 export default Login;
-EOF
