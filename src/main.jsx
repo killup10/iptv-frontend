@@ -3,15 +3,20 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './utils/AuthContext.jsx';
-import PrivateRoute from './utils/PrivateRoute';
-import AdminRoute from './components/AdminRoute.jsx';
 
+// Importa PrivateRoute desde utils
+import PrivateRoute from './utils/PrivateRoute';
+// Importa AdminRoute desde components (ajusta si lo tienes en otro lugar)
+import AdminRoute from './components/AdminRoute';
+
+// Páginas sin extensión
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import Catalog from './pages/Catalogo';
+import Catalog from './pages/Catalog';
 import Player from './pages/Player';
 import IPTVApp from './pages/IPTVApp';
 import AdminPanel from './pages/AdminPanel';
+
 import './index.css';
 
 const container = document.getElementById('root');
