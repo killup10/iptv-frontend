@@ -21,9 +21,6 @@ export function Catalogo({ type }) {
     fetchContenido();
   }, [type]);
 
-  // ...
-}
-
   return (
     <div className="p-4 text-white">
       <h1 className="text-3xl font-bold mb-4">Catálogo de Contenido</h1>
@@ -42,4 +39,6 @@ export function Catalogo({ type }) {
       </div>
     </div>
   );
+}
 
+export default Catalogo;
