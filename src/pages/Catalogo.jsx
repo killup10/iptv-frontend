@@ -2,21 +2,27 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 
-export function Catalogo() {
+export function Catalogo({ type }) {
   const [contenido, setContenido] = useState([]);
 
   useEffect(() => {
     const fetchContenido = async () => {
       try {
         const res = await axios.get("/api/catalogo");
-        setContenido(res.data);
+        const data = res.data;
+
+        const filtered = type ? data.filter(item => item.tipo === type) : data;
+        setContenido(filtered);
       } catch (error) {
         console.error("Error al cargar el catálogo:", error);
       }
     };
 
     fetchContenido();
-  }, []);
+  }, [type]);
+
+  // ...
+}
 
   return (
     <div className="p-4 text-white">
