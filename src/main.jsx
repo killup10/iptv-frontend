@@ -21,22 +21,17 @@ root.render(
   <AuthProvider>
     <Router>
       <Routes>
-        {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected Routes */}
-        <Route path="/" element={<PrivateRoute><Catalog /></PrivateRoute>} />
-        <Route path="/movies" element={<PrivateRoute><Catalog type="movie"/></PrivateRoute>} />
-        <Route path="/series" element={<PrivateRoute><Catalog type="series"/></PrivateRoute>} />
-        <Route path="/player/:id" element={<PrivateRoute><Player/></PrivateRoute>} />
-        <Route path="/iptv" element={<PrivateRoute><IPTVApp/></PrivateRoute>} />
+        <Route path="/"       element={<PrivateRoute><Catalogo /></PrivateRoute>} />
+        <Route path="/movies" element={<PrivateRoute><Catalogo type="movie" /></PrivateRoute>} />
+        <Route path="/series" element={<PrivateRoute><Catalogo type="series" /></PrivateRoute>} />
+        <Route path="/player/:id" element={<PrivateRoute><Player /></PrivateRoute>} />
+        <Route path="/iptv" element={<PrivateRoute><IPTVApp /></PrivateRoute>} />
 
-        {/* Admin Route */}
-        <Route path="/admin" element={<AdminRoute><AdminPanel/></AdminRoute>} />
-
-        {/* Fallback */}
-        <Route path="*" element={<PrivateRoute><Catalog/></PrivateRoute>} />
+        <Route path="/admin"  element={<AdminRoute><AdminPanel /></AdminRoute>} />
+        <Route path="*"       element={<PrivateRoute><Catalogo /></PrivateRoute>} />
       </Routes>
     </Router>
   </AuthProvider>
