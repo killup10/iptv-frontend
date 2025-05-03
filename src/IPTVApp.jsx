@@ -38,7 +38,7 @@ export default function IPTVApp() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <Tab value="live" label="Canales en Vivo" />
         <Tab value="vod" label="Películas" />
-        <Tab value="vod" label="Series" />
+        <Tab value="series" label="Series" />
       </Tabs>
 
       <Input
@@ -86,4 +86,5 @@ export default function IPTVApp() {
         </div>
       )}
     </div>
-
+  );
+}
