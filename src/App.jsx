@@ -13,6 +13,8 @@ import AdminPanel from "./pages/AdminPanel.jsx";
 
 function AppContent() {
   const { user } = useAuth();
+  console.log("🟢 AppContent render"); // Verifica en consola que esto aparece
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-blue-700 text-white py-4 shadow">
@@ -29,22 +31,25 @@ function AppContent() {
           </nav>
         </div>
       </header>
+
       <main className="p-4">
         <Routes>
+          {/* Rutas públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
+          {/* Rutas protegidas */}
           <Route path="/" element={<PrivateRoute><Catalog /></PrivateRoute>} />
-          <Route path="/movies" element={<PrivateRoute><Catalog type="movie"/></PrivateRoute>} />
-          <Route path="/series" element={<PrivateRoute><Catalog type="series"/></PrivateRoute>} />
-          <Route path="/player/:id" element={<PrivateRoute><Player/></PrivateRoute>} />
-          <Route path="/iptv" element={<PrivateRoute><IPTVApp/></PrivateRoute>} />
+          <Route path="/movies" element={<PrivateRoute><Catalog type="movie" /></PrivateRoute>} />
+          <Route path="/series" element={<PrivateRoute><Catalog type="series" /></PrivateRoute>} />
+          <Route path="/player/:id" element={<PrivateRoute><Player /></PrivateRoute>} />
+          <Route path="/iptv" element={<PrivateRoute><IPTVApp /></PrivateRoute>} />
 
-          {/* Ruta /admin protegida solo para admins */}
-          <Route path="/admin" element={<AdminRoute><AdminPanel/></AdminRoute>} />
+          {/* Ruta /admin sólo para admins */}
+          <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
 
           {/* Fallback */}
-          <Route path="*" element={<PrivateRoute><Catalog/></PrivateRoute>} />
+          <Route path="*" element={<PrivateRoute><Catalog /></PrivateRoute>} />
         </Routes>
       </main>
     </div>
