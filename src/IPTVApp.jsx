@@ -1,9 +1,10 @@
 // src/IPTVApp.jsx
 import React, { useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
-import { Tabs } from '../components/ui/tabs.jsx';
-import { Tab } from '../components/ui/tab.jsx';
-import { Input } from '../components/ui/input.jsx';
+import { Tabs } from './components/ui/tabs.jsx';
+import { Tab }  from './components/ui/tab.jsx';
+import { Input } from './components/ui/input.jsx';
+
 
 export default function IPTVApp() {
   const [m3uFiles, setM3uFiles] = useState([]);
