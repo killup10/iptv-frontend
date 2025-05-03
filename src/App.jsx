@@ -4,16 +4,15 @@ import { AuthProvider, useAuth } from "./utils/AuthContext.jsx";
 import PrivateRoute from "./utils/PrivateRoute.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 
-import { Login } from "./pages/Login.jsx";
-import { Register } from "./pages/Register.jsx";
-import Catalog from "./pages/Catalog.jsx";
-import Player from "./pages/Player.jsx";
-import IPTVApp from "./pages/IPTVApp.jsx";
-import AdminPanel from "./pages/AdminPanel.jsx";
+import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
+import Catalog from "./pages/Catalog";
+import Player from "./pages/Player";
+import IPTVApp from "./pages/IPTVApp";
+import AdminPanel from "./pages/AdminPanel";
 
 function AppContent() {
   const { user } = useAuth();
-  console.log("🟢 AppContent render"); // Verifica en consola que esto aparece
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -34,22 +33,18 @@ function AppContent() {
 
       <main className="p-4">
         <Routes>
-          {/* Rutas públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Rutas protegidas */}
           <Route path="/" element={<PrivateRoute><Catalog /></PrivateRoute>} />
-          <Route path="/movies" element={<PrivateRoute><Catalog type="movie" /></PrivateRoute>} />
-          <Route path="/series" element={<PrivateRoute><Catalog type="series" /></PrivateRoute>} />
-          <Route path="/player/:id" element={<PrivateRoute><Player /></PrivateRoute>} />
-          <Route path="/iptv" element={<PrivateRoute><IPTVApp /></PrivateRoute>} />
+          <Route path="/movies" element={<PrivateRoute><Catalog type="movie"/></PrivateRoute>} />
+          <Route path="/series" element={<PrivateRoute><Catalog type="series"/></PrivateRoute>} />
+          <Route path="/player/:id" element={<PrivateRoute><Player/></PrivateRoute>} />
+          <Route path="/iptv" element={<PrivateRoute><IPTVApp/></PrivateRoute>} />
 
-          {/* Ruta /admin sólo para admins */}
-          <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminPanel/></AdminRoute>} />
 
-          {/* Fallback */}
-          <Route path="*" element={<PrivateRoute><Catalog /></PrivateRoute>} />
+          <Route path="*" element={<PrivateRoute><Catalog/></PrivateRoute>} />
         </Routes>
       </main>
     </div>
