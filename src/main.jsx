@@ -6,12 +6,12 @@ import { AuthProvider } from './utils/AuthContext.jsx';
 import PrivateRoute from './utils/PrivateRoute';
 import AdminRoute from './components/AdminRoute.jsx';
 
-import { Login } from './pages/Login.jsx';
-import { Register } from './pages/Register.jsx';
-import Catalog from './pages/Catalog.jsx';
-import Player from './pages/Player.jsx';
-import IPTVApp from './pages/IPTVApp.jsx';
-import AdminPanel from './pages/AdminPanel.jsx';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import Catalog from './pages/Catalog';
+import Player from './pages/Player';
+import IPTVApp from './pages/IPTVApp';
+import AdminPanel from './pages/AdminPanel';
 import './index.css';
 
 const container = document.getElementById('root');
