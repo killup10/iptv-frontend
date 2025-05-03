@@ -3,7 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './utils/AuthContext.jsx';
-import PrivateRoute from './components/PrivateRoute.jsx';
+import PrivateRoute from './utils/PrivateRoute';
 import AdminRoute from './components/AdminRoute.jsx';
 
 import { Login } from './pages/Login.jsx';
