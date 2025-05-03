@@ -1,3 +1,4 @@
+// src/IPTVApp.jsx
 import React, { useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
 import { Tabs } from '../components/ui/tabs.jsx';
@@ -85,4 +86,4 @@ export default function IPTVApp() {
         </div>
       )}
     </div>
-]
+
