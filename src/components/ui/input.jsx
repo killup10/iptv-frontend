@@ -5,7 +5,10 @@ export function Input(props) {
   return (
     <input
       {...props}
-      className={'w-full p-2 border rounded ' + (props.className || '')}
+      className={
+        (props.className || '') +
+        ' w-full px-4 py-2 rounded border focus:outline-none focus:ring-2 focus:ring-blue-500'
+      }
     />
   );
 }
