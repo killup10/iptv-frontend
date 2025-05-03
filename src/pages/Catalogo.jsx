@@ -42,4 +42,4 @@ export function Catalogo({ type }) {
       </div>
     </div>
   );
-}
+
