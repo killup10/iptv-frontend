@@ -1,3 +1,7 @@
+import React, { createContext, useContext, useState, useEffect } from "react";
+
+const AuthContext = createContext();
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
@@ -11,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const login = (userData) => {
     console.log("USER:", userData);
     localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData); // aquí estaba el error
+    setUser(userData); // ✅ Asigna correctamente el rol aquí
   };
 
   const logout = () => {
@@ -25,3 +29,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+// ✅ Esta línea es fundamental, exporta el hook
+export const useAuth = () => useContext(AuthContext);
