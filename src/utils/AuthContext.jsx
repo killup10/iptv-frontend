@@ -1,11 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-
-const AuthContext = createContext();
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  // Al montar, cargo user desde localStorage (si existe)
   useEffect(() => {
     const stored = localStorage.getItem("user");
     if (stored) {
@@ -13,12 +8,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Esta función la llamaremos desde Login.jsx
   const login = (userData) => {
-    // Guardamos en localStorage para persistir tras refresh
+    console.log("USER:", userData);
     localStorage.setItem("user", JSON.stringify(userData));
-    setUser({ ...userData.user, role: 'admin' });
-
+    setUser(userData); // aquí estaba el error
+  };
 
   const logout = () => {
     localStorage.removeItem("user");
@@ -31,6 +25,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-// Hook para consumir el contexto
-export const useAuth = () => useContext(AuthContext);
