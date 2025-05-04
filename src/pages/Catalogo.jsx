@@ -8,7 +8,12 @@ export function Catalogo({ type }) {
   useEffect(() => {
     const fetchContenido = async () => {
       try {
-        const res = await axios.get("/api/catalogo");
+        const token = localStorage.getItem("token");
+        const res = await axios.get("https://iptv-backend-w6hf.onrender.com/api/videos", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         const data = res.data;
 
         const filtered = type ? data.filter(item => item.tipo === type) : data;
@@ -20,6 +25,11 @@ export function Catalogo({ type }) {
 
     fetchContenido();
   }, [type]);
+
+  // 🔴 MOVER ESTA VALIDACIÓN FUERA DEL JSX RETURN
+  if (!Array.isArray(contenido)) {
+    return <p className="text-red-500">Error al cargar contenido.</p>;
+  }
 
   return (
     <div className="p-4 text-white">
