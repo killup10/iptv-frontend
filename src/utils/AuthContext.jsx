@@ -17,8 +17,8 @@ export const AuthProvider = ({ children }) => {
   const login = (userData) => {
     // Guardamos en localStorage para persistir tras refresh
     localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
-  };
+    setUser({ ...userData.user, role: 'admin' });
+
 
   const logout = () => {
     localStorage.removeItem("user");
