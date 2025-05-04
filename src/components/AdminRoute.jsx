@@ -1,6 +1,9 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext.jsx';
+import UploadManual from "../components/UploadManual";
+
+<UploadManual />
 
 const AdminRoute = ({ children }) => {
   const { user } = useAuth();
