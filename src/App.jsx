@@ -8,8 +8,9 @@ import { Login } from "./pages/Login.jsx";
 import { Register } from "./pages/Register.jsx";
 import Catalogo from "./pages/Catalogo.jsx";
 import Player from "./pages/Player.jsx";
-import IPTVApp      from './IPTVApp.jsx';
+import IPTVApp from './IPTVApp.jsx';
 import AdminPanel from "./pages/AdminPanel.jsx";
+import SubirM3U from "./pages/SubirM3U.jsx";
 
 function AppContent() {
   const { user } = useAuth();
@@ -25,7 +26,10 @@ function AppContent() {
             <Link to="/series" className="hover:underline">Series</Link>
             <Link to="/iptv" className="hover:underline">IPTV</Link>
             {user?.role === "admin" && (
-              <Link to="/admin" className="hover:underline">Admin</Link>
+              <>
+                <Link to="/admin" className="hover:underline">Admin</Link>
+                <Link to="/subir-m3u" className="hover:underline">Subir M3U</Link>
+              </>
             )}
           </nav>
         </div>
@@ -36,14 +40,16 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          <Route path="/" element={<PrivateRoute><Catalog /></PrivateRoute>} />
-          <Route path="/movies" element={<PrivateRoute><Catalog type="movie"/></PrivateRoute>} />
-          <Route path="/series" element={<PrivateRoute><Catalog type="series"/></PrivateRoute>} />
-          <Route path="/player/:id" element={<PrivateRoute><Player/></PrivateRoute>} />
-          <Route path="/iptv" element={<PrivateRoute><IPTVApp/></PrivateRoute>} />
+          <Route path="/" element={<PrivateRoute><Catalogo /></PrivateRoute>} />
+          <Route path="/movies" element={<PrivateRoute><Catalogo type="movie" /></PrivateRoute>} />
+          <Route path="/series" element={<PrivateRoute><Catalogo type="series" /></PrivateRoute>} />
+          <Route path="/player/:id" element={<PrivateRoute><Player /></PrivateRoute>} />
+          <Route path="/iptv" element={<PrivateRoute><IPTVApp /></PrivateRoute>} />
 
-          <Route path="/admin" element={<AdminRoute><AdminPanel/></AdminRoute>} />
-          <Route path="*" element={<PrivateRoute><Catalog/></PrivateRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+          <Route path="/subir-m3u" element={<AdminRoute><SubirM3U /></AdminRoute>} />
+
+          <Route path="*" element={<PrivateRoute><Catalogo /></PrivateRoute>} />
         </Routes>
       </main>
     </div>
