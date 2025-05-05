@@ -8,6 +8,7 @@ import { Login } from './pages/Login.jsx'
 import { Home } from './pages/Home.jsx'
 import { Watch } from './pages/Watch.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
+import IPTVApp from './IPTVApp.jsx' // Añadido
 
 const router = createBrowserRouter([
   {
@@ -29,6 +30,10 @@ const router = createBrowserRouter([
       {
         path: "/watch/:id",
         element: <Watch />,
+      },
+      {
+        path: "/tv", // Nueva ruta para IPTV/canales
+        element: <IPTVApp />,
       }
     ]
   }

@@ -1,9 +1,9 @@
-// src/IPTVApp.jsx
 import React, { useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
 import { Tabs } from './components/ui/tabs.jsx';
 import { Tab } from './components/ui/tab.jsx';
 import { Input } from './components/ui/input.jsx';
+import { Search } from 'lucide-react'; // Asegúrate de tener este paquete instalado
 
 export default function IPTVApp() {
   const [m3uFiles, setM3uFiles] = useState([]);
@@ -13,12 +13,14 @@ export default function IPTVApp() {
   const [selectedVideo, setSelectedVideo] = useState('');
   const [activeTab, setActiveTab] = useState('live');
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL;
   const authHeader = { Authorization: `Bearer ${localStorage.getItem('token')}` };
 
   // Cargar datos cuando cambia la pestaña activa
   useEffect(() => {
+    setIsLoading(true);
     if (activeTab === 'live') {
       loadM3UFiles();
       loadChannels();
@@ -39,10 +41,12 @@ export default function IPTVApp() {
       .then(data => {
         console.log('M3U files cargados:', data);
         setM3uFiles(data.files || []);
+        setIsLoading(false);
       })
       .catch(err => {
         console.error('Error al cargar M3U:', err);
         setError(err.message);
+        setIsLoading(false);
       });
   };
 
@@ -58,10 +62,12 @@ export default function IPTVApp() {
       .then(data => {
         console.log('Canales cargados:', data);
         setChannels(data || []);
+        setIsLoading(false);
       })
       .catch(err => {
         console.error('Error al cargar canales:', err);
         setError(err.message);
+        setIsLoading(false);
       });
   };
 
@@ -77,157 +83,116 @@ export default function IPTVApp() {
       .then(data => {
         console.log('Videos cargados:', data);
         setVideoFiles(data || []);
+        setIsLoading(false);
       })
       .catch(err => {
         console.error('Error al cargar videos:', err);
         setError(err.message);
+        setIsLoading(false);
       });
   };
-
-  // Log para depuración
-  useEffect(() => {
-    console.log("Estado actual:");
-    console.log("- M3U Files:", m3uFiles.length);
-    console.log("- Channels:", channels.length);
-    console.log("- Videos:", videoFiles.length);
-    console.log("- Tab activa:", activeTab);
-  }, [m3uFiles, channels, videoFiles, activeTab]);
 
   const filteredM3U = m3uFiles.filter(file => 
     file.toLowerCase().includes(search.toLowerCase())
   );
   
   const filteredChannels = channels.filter(channel => 
-    channel.name.toLowerCase().includes(search.toLowerCase())
+    channel?.name?.toLowerCase().includes(search.toLowerCase())
   );
   
   const filteredVideos = videoFiles.filter(video => 
-    video.title.toLowerCase().includes(search.toLowerCase())
+    video?.title?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <h1 className="text-3xl font-bold mb-4 text-center">TeamG Play</h1>
-      <p className="text-center text-gray-300 mb-6">
-        Explora nuestro catálogo de canales en vivo, películas y series en alta calidad.
-      </p>
+    <div className="min-h-screen bg-[#121212] text-white p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Hero section */}
+        {!selectedVideo && (
+          <div className="mb-8 text-center">
+            <h1 className="text-4xl font-bold mb-2">
+              <span className="text-white">Bienvenido a </span>
+              <span className="text-[#8B5CF6]">TeamG Play</span>
+            </h1>
+            <p className="text-gray-400">
+              Explora nuestro catálogo de canales en vivo, películas y series en alta calidad.
+            </p>
+          </div>
+        )}
 
-      {error && (
-        <div className="p-3 mb-4 bg-red-800 border border-red-600 text-white rounded-lg">
-          Error: {error}
+        {error && (
+          <div className="p-3 mb-4 bg-red-900/50 border border-red-500 text-white rounded-lg">
+            Error: {error}
+          </div>
+        )}
+
+        {/* Tabs section */}
+        <div className="mb-6 bg-[#1E1E1E] rounded-lg p-1 inline-flex">
+          <button 
+            className={`px-4 py-2 rounded-md ${activeTab === 'live' ? 'bg-[#8B5CF6] text-white' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('live')}
+          >
+            TV en Vivo
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-md ${activeTab === 'vod' ? 'bg-[#8B5CF6] text-white' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('vod')}
+          >
+            Películas
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-md ${activeTab === 'series' ? 'bg-[#8B5CF6] text-white' : 'text-gray-400'}`}
+            onClick={() => setActiveTab('series')}
+          >
+            Series
+          </button>
         </div>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <Tab value="live" label="TV en Vivo" />
-        <Tab value="vod" label="Películas" />
-        <Tab value="series" label="Series" />
-      </Tabs>
-
-      <Input
-        placeholder="Buscar..."
-        className="mb-4 bg-gray-800 text-white border-gray-700"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
-
-      {activeTab === 'live' && (
-        <>
-          <h2 className="text-xl font-semibold mb-4">
-            Canales en Vivo ({filteredChannels.length + filteredM3U.length})
-          </h2>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredChannels.map(channel => (
-              <button
-                key={`channel-${channel._id}`}
-                className="bg-gray-800 rounded-xl p-4 hover:bg-gray-700 transition flex flex-col items-center"
-                onClick={() => setSelectedVideo(channel.url)}
-              >
-                <span className="text-3xl mb-2">📺</span>
-                <span className="text-center">{channel.name}</span>
-              </button>
-            ))}
-
-            {filteredM3U.map(file => (
-              <button
-                key={`file-${file}`}
-                className="bg-gray-800 rounded-xl p-4 hover:bg-gray-700 transition flex flex-col items-center"
-                onClick={() => setSelectedVideo(`${API_URL}/uploads/${file}`)}
-              >
-                <span className="text-3xl mb-2">📁</span>
-                <span className="text-center">{file}</span>
-              </button>
-            ))}
-
-            {filteredChannels.length === 0 && filteredM3U.length === 0 && (
-              <p className="text-gray-400 col-span-full text-center">No hay canales disponibles</p>
-            )}
-          </div>
-        </>
-      )}
-
-      {activeTab === 'vod' && (
-        <>
-          <h2 className="text-xl font-semibold mb-4">
-            Películas ({filteredVideos.length})
-          </h2>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredVideos.map(video => (
-              <button
-                key={video._id}
-                className="bg-gray-800 rounded-xl p-4 hover:bg-gray-700 transition flex flex-col items-center"
-                onClick={() => setSelectedVideo(video.url)}
-              >
-                <span className="text-3xl mb-2">🎬</span>
-                <span className="text-center">{video.title}</span>
-              </button>
-            ))}
-            
-            {filteredVideos.length === 0 && (
-              <p className="text-gray-400 col-span-full text-center">No hay películas disponibles</p>
-            )}
-          </div>
-        </>
-      )}
-
-      {selectedVideo && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-2">
-            Reproduciendo: {
-              activeTab === 'live' 
-                ? channels.find(c => c.url === selectedVideo)?.name || selectedVideo.split('/').pop()
-                : videoFiles.find(v => v.url === selectedVideo)?.title || 'Video'
-            }
-          </h2>
-          <ReactPlayer
-            url={selectedVideo}
-            controls
-            width="100%"
-            height="480px"
-            playing
-            config={{
-              file: {
-                attributes: { crossOrigin: 'anonymous' },
-                forceHLS: true,  // Forzar HLS para reproducir streams m3u8
-                hlsOptions: {
-                  enableWorker: true,
-                  lowLatencyMode: true
-                }
-              }
-            }}
-            onError={(e) => {
-              console.error("Error en reproducción:", e);
-              setError(`Error al reproducir el video: ${e.message || 'Verifique la URL'}`);
-            }}
+        {/* Search bar */}
+        <div className="relative mb-6">
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+            <Search size={18} />
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar..."
+            className="w-full pl-10 pr-4 py-3 bg-[#1E1E1E] text-white rounded-lg border border-[#333] focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
-      )}
 
-      <div className="mt-8 text-center text-gray-500 text-sm">
-        <p>Versión 1.0.0 - TeamG Play</p>
-      </div>
-    </div>
-  );
-}
+        {/* Content section */}
+        {selectedVideo ? (
+          <div className="mt-8">
+            <button 
+              onClick={() => setSelectedVideo('')}
+              className="mb-4 flex items-center text-[#8B5CF6] hover:underline"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              Volver
+            </button>
+            
+            <h2 className="text-xl font-semibold mb-4">
+              Reproduciendo: {
+                activeTab === 'live' 
+                  ? channels.find(c => c.url === selectedVideo)?.name || selectedVideo.split('/').pop()
+                  : videoFiles.find(v => v.url === selectedVideo)?.title || 'Video'
+              }
+            </h2>
+            
+            <div className="rounded-xl overflow-hidden shadow-lg">
+              <ReactPlayer
+                url={selectedVideo}
+                controls
+                width="100%"
+                height="calc(100vh - 300px)"
+                playing
+                config={{
+                  file: {
+                    attributes: { crossOrigin: 'anonymous' },
+                    forceHLS: true,
+                    hlsOptions: {
+                      enableWorker:
