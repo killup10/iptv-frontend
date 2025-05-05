@@ -6,7 +6,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { AuthProvider } from './utils/AuthContext.jsx'
 import { Login } from './pages/Login.jsx'
 import { Home } from './pages/Home.jsx'
-import { Watch } from './pages/VideoPlayer.jsx'
+import { Watch } from './pages/Watch.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
 
 const router = createBrowserRouter([
