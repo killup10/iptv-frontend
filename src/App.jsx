@@ -61,10 +61,8 @@ function AppContent() {
 
 export const App = () => (
   <AuthProvider>
-    <Router>
       <AppContent />
-    </Router>
-  </AuthProvider>
+   </AuthProvider>
 );
 
 export default App;
