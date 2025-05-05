@@ -30,3 +30,6 @@ export const Player = () => {
     </div>
   );
 };
+
+// Añade esta línea para exportar por defecto
+export default Player;
