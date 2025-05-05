@@ -1,10 +1,16 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom"; // Añadimos useLocation
 import { useAuth } from "../utils/AuthContext";
 import { Home, Film, Tv, PlayCircle, PanelLeft, LogOut, User } from "lucide-react";
 
 export function NavBar() {
   const { user, logout } = useAuth();
+  const location = useLocation(); // Obtenemos la ubicación actual
+  
+  // No mostrar la barra de navegación en la página de login
+  if (location.pathname === '/login') {
+    return null;
+  }
 
   return (
     <nav className="bg-[#1a1a2e] text-white px-4 py-3 shadow-lg border-b border-gray-800">
