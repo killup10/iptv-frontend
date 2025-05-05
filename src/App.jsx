@@ -11,6 +11,7 @@ import Player from "./pages/Player.jsx";
 import IPTVApp from './IPTVApp.jsx';
 import AdminPanel from "./pages/AdminPanel.jsx";
 import SubirM3U from "./pages/SubirM3U.jsx";
+import ContenidoAdmin from "./pages/ContenidoAdmin.jsx"; // 👈 Import nuevo
 
 function AppContent() {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ function AppContent() {
               <>
                 <Link to="/admin" className="hover:underline">Admin</Link>
                 <Link to="/subir-m3u" className="hover:underline">Subir M3U</Link>
+                <Link to="/contenido-admin" className="hover:underline">Contenido</Link> {/* 👈 Nuevo link */}
               </>
             )}
           </nav>
@@ -48,6 +50,7 @@ function AppContent() {
 
           <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
           <Route path="/subir-m3u" element={<AdminRoute><SubirM3U /></AdminRoute>} />
+          <Route path="/contenido-admin" element={<AdminRoute><ContenidoAdmin /></AdminRoute>} /> {/* 👈 Nueva ruta */}
 
           <Route path="*" element={<PrivateRoute><Catalogo /></PrivateRoute>} />
         </Routes>
