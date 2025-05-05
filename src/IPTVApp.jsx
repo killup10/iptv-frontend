@@ -1,3 +1,4 @@
+// src/IPTVApp.jsx
 import React, { useEffect, useState } from 'react';
 import ReactPlayer from 'react-player';
 import { Tabs } from './components/ui/tabs.jsx';
@@ -195,4 +196,90 @@ export default function IPTVApp() {
                     attributes: { crossOrigin: 'anonymous' },
                     forceHLS: true,
                     hlsOptions: {
-                      enableWorker:
+                      enableWorker: true,
+                      lowLatencyMode: true
+                    }
+                  }
+                }}
+                onError={(e) => {
+                  console.error("Error en reproducción:", e);
+                  setError(`Error al reproducir el video: ${e.message || 'Verifique la URL'}`);
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            {isLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#8B5CF6]"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {activeTab === 'live' && filteredChannels.map(channel => (
+                  <div
+                    key={`channel-${channel._id}`}
+                    className="bg-[#1E1E1E] rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#8B5CF6] transition-all"
+                    onClick={() => setSelectedVideo(channel.url)}
+                  >
+                    <div className="h-32 bg-[#2D2D3A] flex items-center justify-center">
+                      <span className="text-4xl">📺</span>
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-medium truncate">{channel.name}</h3>
+                      <p className="text-xs text-gray-400">Canal en vivo</p>
+                    </div>
+                  </div>
+                ))}
+                
+                {activeTab === 'live' && filteredM3U.map(file => (
+                  <div
+                    key={`file-${file}`}
+                    className="bg-[#1E1E1E] rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#8B5CF6] transition-all"
+                    onClick={() => setSelectedVideo(`${API_URL}/uploads/${file}`)}
+                  >
+                    <div className="h-32 bg-[#2D2D3A] flex items-center justify-center">
+                      <span className="text-4xl">📁</span>
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-medium truncate">{file}</h3>
+                      <p className="text-xs text-gray-400">Archivo M3U</p>
+                    </div>
+                  </div>
+                ))}
+                
+                {activeTab === 'vod' && filteredVideos.map(video => (
+                  <div
+                    key={video._id}
+                    className="bg-[#1E1E1E] rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#8B5CF6] transition-all"
+                    onClick={() => setSelectedVideo(video.url)}
+                  >
+                    <div className="h-32 bg-[#2D2D3A] flex items-center justify-center">
+                      <span className="text-4xl">🎬</span>
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-medium truncate">{video.title}</h3>
+                      <p className="text-xs text-gray-400">Película</p>
+                    </div>
+                  </div>
+                ))}
+                
+                {activeTab === 'live' && filteredChannels.length === 0 && filteredM3U.length === 0 && (
+                  <p className="col-span-full text-center text-gray-400 py-10">No hay canales disponibles</p>
+                )}
+                
+                {activeTab === 'vod' && filteredVideos.length === 0 && (
+                  <p className="col-span-full text-center text-gray-400 py-10">No hay películas disponibles</p>
+                )}
+                
+                {activeTab === 'series' && (
+                  <p className="col-span-full text-center text-gray-400 py-10">Próximamente: Catálogo de series</p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
