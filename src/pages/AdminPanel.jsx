@@ -34,17 +34,24 @@ export default function AdminPanel() {
 
   // Cargar canales existentes al iniciar
   useEffect(() => {
-    fetchChannels();
-  }, []);
+    if (activeTab === "channels") {
+      fetchChannels();
+    }
+  }, [activeTab]);
 
   const fetchChannels = async () => {
     try {
-      const res = await fetch(`${API}/api/channels`, {
+      console.log("Obteniendo canales desde:", `${API}/api/channels/list`);
+      const res = await fetch(`${API}/api/channels/list`, {
         headers: authHeader
       });
-      if (!res.ok) throw new Error("Error al obtener canales");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error al obtener canales");
+      }
       const data = await res.json();
-      setChannels(data);
+      console.log("Canales recibidos:", data);
+      setChannels(data || []);
     } catch (error) {
       console.error("Error al cargar canales:", error);
       setErrorMsg("No se pudieron cargar los canales existentes");
@@ -103,21 +110,30 @@ export default function AdminPanel() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      console.log("Enviando canal:", { name: channelName, url: channelUrl });
       const res = await fetch(`${API}/api/channels`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ name: channelName, url: channelUrl })
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error desconocido");
+      }
+      
       const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Error desconocido");
       setSuccessMsg("Canal agregado correctamente");
       setErrorMsg("");
+      
       // Limpiar formulario después de éxito
       setChannelName("");
       setChannelUrl("");
+      
       // Recargar lista de canales
       fetchChannels();
     } catch (error) {
+      console.error("Error al agregar canal:", error);
       setErrorMsg(error.message);
       setSuccessMsg("");
     } finally {
@@ -133,12 +149,15 @@ export default function AdminPanel() {
         method: "DELETE",
         headers: authHeader
       });
-      if (!res.ok) throw new Error("Error al eliminar canal");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error al eliminar canal");
+      }
       setSuccessMsg("Canal eliminado correctamente");
       fetchChannels(); // Recargar la lista
     } catch (error) {
       console.error('Error al eliminar canal:', error);
-      setErrorMsg("Error al eliminar el canal");
+      setErrorMsg(error.message || "Error al eliminar el canal");
     }
   };
 
@@ -238,8 +257,8 @@ export default function AdminPanel() {
                 {channels.map(channel => (
                   <div key={channel._id} className="p-3 bg-gray-700 rounded-lg flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold">{channel.name}</h4>
-                      <p className="text-sm text-gray-400 truncate">{channel.url}</p>
+                      <h4 className="font-bold">{channel.name || 'Sin nombre'}</h4>
+                      <p className="text-sm text-gray-400 truncate">{channel.url || 'Sin URL'}</p>
                     </div>
                     <Button 
                       onClick={() => deleteChannel(channel._id)}

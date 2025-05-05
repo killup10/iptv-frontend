@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { login as loginService } from "../services/AuthService";
 import { useAuth } from "../utils/AuthContext";
-import { Eye, EyeOff, User, Lock } from "lucide-react"; // Descomentado para usar los iconos
+import { Eye, EyeOff, User, Lock } from "lucide-react";
 
 // Componente InputField reutilizable
 const InputField = ({ 
@@ -119,72 +119,67 @@ export function Login() {
   };
 
   return (
-    // Aquí agregamos flex-col para asegurar que todo esté centrado verticalmente
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] px-4">
-      <div 
-        className="bg-[#1e1e2f] p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md mx-auto text-white transition-all duration-300"
-        role="dialog"
-        aria-labelledby="login-title"
-      >
-        <div className="flex justify-center mb-6">
-          <h2 id="login-title" className="text-3xl font-extrabold text-center flex items-center justify-center gap-2">
-            <span className="text-blue-500 text-4xl">▶</span> TeamG <span className="text-purple-500">Play</span>
-          </h2>
-        </div>
-
-        {error && (
-          <div 
-            className="bg-red-500/20 border border-red-500/50 text-red-300 text-sm p-3 rounded-lg mb-4 transition-all"
-            role="alert"
-          >
-            <p className="text-center font-medium">{error}</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+      <div className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
+        <div className="p-8">
+          <div className="flex flex-col items-center justify-center mb-6">
+            <h1 className="text-3xl font-bold text-white flex items-center">
+              <span className="text-blue-500 text-4xl mr-2">▶</span> TeamG <span className="text-purple-500 ml-1">Play</span>
+            </h1>
+            <p className="text-gray-400 mt-2">Accede a tu cuenta</p>
           </div>
-        )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <InputField
-            id="username"
-            label="Usuario"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="Ingresa tu usuario"
-            icon={<User size={18} />}
-            disabled={isLoading}
-          />
-          
-          <PasswordField
-            id="password"
-            label="Contraseña"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Tu contraseña"
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-            disabled={isLoading}
-          />
+          {error && (
+            <div className="bg-red-500/20 border border-red-500/50 text-red-300 text-sm p-3 rounded-lg mb-6 transition-all">
+              <p className="text-center">{error}</p>
+            </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white py-3 rounded-lg font-semibold transition duration-200 transform hover:scale-[1.01] active:scale-[0.99] ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            aria-busy={isLoading}
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Iniciando sesión...</span>
-              </span>
-            ) : 'Iniciar sesión'}
-          </button>
-        </form>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <InputField
+              id="username"
+              label="Usuario"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Ingresa tu usuario"
+              icon={<User size={18} />}
+              disabled={isLoading}
+            />
+            
+            <PasswordField
+              id="password"
+              label="Contraseña"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Tu contraseña"
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              disabled={isLoading}
+            />
 
-        <div className="mt-8 pt-6 border-t border-gray-700/50">
-          <p className="text-center text-sm text-gray-400">
-            ¿No tienes cuenta? <span className="text-blue-400 font-medium hover:text-blue-300 cursor-pointer transition-colors">Contacta con el administrador</span>
-          </p>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white py-3 rounded-lg font-semibold transition duration-200 transform hover:scale-[1.01] active:scale-[0.99] ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              aria-busy={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Iniciando sesión...</span>
+                </span>
+              ) : 'Iniciar sesión'}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-4 border-t border-gray-700">
+            <p className="text-center text-sm text-gray-400">
+              ¿No tienes cuenta? <span className="text-blue-400 font-medium hover:text-blue-300 cursor-pointer transition-colors">Contacta con el administrador</span>
+            </p>
+          </div>
         </div>
       </div>
     </div>
