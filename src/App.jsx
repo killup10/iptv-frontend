@@ -1,8 +1,9 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./utils/AuthContext.jsx";
 import { PrivateRoute } from './utils/PrivateRoute.jsx';
 import AdminRoute from "./components/AdminRoute.jsx";
+import { NavBar } from "./components/NavBar.jsx"; // Importar el NavBar mejorado
 
 import { Login } from "./pages/Login.jsx";
 import { Register } from "./pages/Register.jsx";
@@ -11,33 +12,15 @@ import Player from "./pages/Player.jsx";
 import IPTVApp from './IPTVApp.jsx';
 import AdminPanel from "./pages/AdminPanel.jsx";
 import SubirM3U from "./pages/SubirM3U.jsx";
-import ContenidoAdmin from "./pages/ContenidoAdmin.jsx"; // 👈 Import nuevo
+import ContenidoAdmin from "./pages/ContenidoAdmin.jsx";
 
 function AppContent() {
-  const { user } = useAuth();
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-700 text-white py-4 shadow">
-        <div className="max-w-6xl mx-auto px-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">TeamG Play</h1>
-          <nav className="space-x-4">
-            <Link to="/" className="hover:underline">Home</Link>
-            <Link to="/movies" className="hover:underline">Movies</Link>
-            <Link to="/series" className="hover:underline">Series</Link>
-            <Link to="/iptv" className="hover:underline">IPTV</Link>
-            {user?.role === "admin" && (
-              <>
-                <Link to="/admin" className="hover:underline">Admin</Link>
-                <Link to="/subir-m3u" className="hover:underline">Subir M3U</Link>
-                <Link to="/contenido-admin" className="hover:underline">Contenido</Link> {/* 👈 Nuevo link */}
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Reemplazamos el header por el NavBar mejorado */}
+      <NavBar />
 
-      <main className="p-4">
+      <main className="p-4 pt-20"> {/* Ajustamos el padding para dejar espacio para la barra */}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -50,7 +33,7 @@ function AppContent() {
 
           <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
           <Route path="/subir-m3u" element={<AdminRoute><SubirM3U /></AdminRoute>} />
-          <Route path="/contenido-admin" element={<AdminRoute><ContenidoAdmin /></AdminRoute>} /> {/* 👈 Nueva ruta */}
+          <Route path="/contenido-admin" element={<AdminRoute><ContenidoAdmin /></AdminRoute>} />
 
           <Route path="*" element={<PrivateRoute><Catalogo /></PrivateRoute>} />
         </Routes>
@@ -61,8 +44,10 @@ function AppContent() {
 
 export const App = () => (
   <AuthProvider>
+    <Router>
       <AppContent />
-   </AuthProvider>
+    </Router>
+  </AuthProvider>
 );
 
 export default App;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { login as loginService } from "../services/AuthService";
 import { useAuth } from "../utils/AuthContext";
-// import { Eye, EyeOff, User, Lock } from "lucide-react"; // Alternativa a react-icons
+import { Eye, EyeOff, User, Lock } from "lucide-react"; // Descomentado para usar los iconos
 
 // Componente InputField reutilizable
 const InputField = ({ 
@@ -57,8 +57,7 @@ const PasswordField = ({
     </label>
     <div className="relative">
       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-        {/* <Lock size={18} /> */}
-        🔒
+        <Lock size={18} />
       </span>
       <input
         id={id}
@@ -78,8 +77,7 @@ const PasswordField = ({
         aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
         title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
       >
-        {/* {showPassword ? <EyeOff size={18} /> : <Eye size={18} />} */}
-        {showPassword ? "🙈" : "👁️"}
+        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
       </button>
     </div>
   </div>
@@ -121,9 +119,10 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] px-4">
+    // Aquí agregamos flex-col para asegurar que todo esté centrado verticalmente
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] px-4">
       <div 
-        className="bg-[#1e1e2f] p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md text-white transition-all duration-300"
+        className="bg-[#1e1e2f] p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md mx-auto text-white transition-all duration-300"
         role="dialog"
         aria-labelledby="login-title"
       >
@@ -149,7 +148,7 @@ export function Login() {
             value={username}
             onChange={e => setUsername(e.target.value)}
             placeholder="Ingresa tu usuario"
-            icon={/* <User size={18} /> */ "👤"}
+            icon={<User size={18} />}
             disabled={isLoading}
           />
           
