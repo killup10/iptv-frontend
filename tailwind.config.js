@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: [
     "./index.html",
     "./src/**/*.{js,jsx,ts,tsx}"
@@ -9,8 +9,6 @@ module.exports = {
       colors: {
         netflixgray: "#e5e5e5",
         netflixred: "#E50914",
-      },
-      backgroundColor: {
         netflixbg: "#141414",
       },
     },
