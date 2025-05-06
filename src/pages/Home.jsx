@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import NavBar from '../components/NavBar.jsx';
+import Navbar from '../components/Navbar.jsx';
 import Carousel from '../components/Carousel.jsx';
 import { fetchChannels, fetchMovies, fetchSeries } from '../utils/api.js';
 
@@ -40,8 +40,8 @@ export function Home() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#141414]">
-        <div className="w-16 h-16 border-4 border-[#E50914] border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen bg-netflixbg">
+        <div className="w-16 h-16 border-4 border-netflixred border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -49,8 +49,8 @@ export function Home() {
   const hero = channels[0];
 
   return (
-    <div className="min-h-screen bg-[#141414] text-[#e5e5e5]">
-      <NavBar />
+    <div className="min-h-screen bg-netflixbg text-netflixgray">
+      <Navbar />
       <main className="pt-20">
         {/* Hero banner */}
         {hero && (
@@ -70,7 +70,7 @@ export function Home() {
               </p>
               <Link
                 to="/tv"
-                className="bg-[#E50914] hover:bg-red-700 text-white px-6 py-3 rounded-md font-medium"
+                className="bg-netflixred hover:bg-red-700 text-white px-6 py-3 rounded-md font-medium"
               >
                 Ver en Vivo
               </Link>
