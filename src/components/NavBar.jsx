@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function Navbar() {
+export default function NavBar() {
   return (
     <nav className="fixed top-0 w-full z-50 bg-netflixbg bg-opacity-90 px-6 py-4 flex items-center justify-between">
       <div className="text-2xl font-bold text-white">TeamG Play</div>
