@@ -34,50 +34,60 @@ export function Home() {
     loadData();
   }, []);
 
+  const onChannelClick = (channel) => navigate(`/watch/${channel.id}`);
+  const onMovieClick = (movie) => navigate(`/watch/${movie.id}`);
+  const onSeriesClick = (serie) => navigate(`/watch/${serie.id}`);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-netflixbg">
         <div className="w-16 h-16 border-4 border-netflixred border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  const onChannelClick = (channel) => navigate(`/watch/${channel.id}`);
-  const onMovieClick = (movie) => navigate(`/watch/${movie.id}`);
-  const onSeriesClick = (serie) => navigate(`/watch/${serie.id}`);
+  const hero = channels[0];
 
   return (
     <div className="min-h-screen bg-netflixbg text-netflixgray">
       <Navbar />
       <main className="pt-20">
         {/* Hero banner */}
-        <section className="relative h-[60vh] w-full overflow-hidden mb-8">
-          <img
-            src={channels[0]?.thumbnail}
-            alt={channels[0]?.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent"></div>
-          <div className="relative z-10 container mx-auto px-6 py-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              {channels[0]?.name}
-            </h1>
-            <p className="text-lg text-gray-300 max-w-xl mb-6">
-              Disfruta de nuestro canal destacado en vivo.
-            </p>
-            <Link
-              to="/tv"
-              className="bg-netflixred hover:bg-red-700 text-white px-6 py-3 rounded-md font-medium"
-            >
-              Ver en Vivo
-            </Link>
-          </div>
-        </section>
+        {hero && (
+          <section className="relative h-[60vh] w-full overflow-hidden mb-8">
+            <img
+              src={hero.thumbnail}
+              alt={hero.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent"></div>
+            <div className="relative z-10 container mx-auto px-6 py-12">
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                {hero.name}
+              </h1>
+              <p className="text-lg text-gray-300 max-w-xl mb-6">
+                Disfruta de nuestro canal destacado en vivo.
+              </p>
+              <Link
+                to="/tv"
+                className="bg-netflixred hover:bg-red-700 text-white px-6 py-3 rounded-md font-medium"
+              >
+                Ver en Vivo
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* Carousels */}
-        <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
-        <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
-        <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
+        {channels.length > 0 && (
+          <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
+        )}
+        {movies.length > 0 && (
+          <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
+        )}
+        {series.length > 0 && (
+          <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
+        )}
       </main>
     </div>
   );
