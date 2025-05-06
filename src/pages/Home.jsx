@@ -50,7 +50,7 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-netflixbg text-netflixgray">
-      <Navbar />
+      <NavBar />
       <main className="pt-20">
         {/* Hero banner */}
         {hero && (
