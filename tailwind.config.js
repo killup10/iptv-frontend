@@ -13,8 +13,12 @@ export default {
       },
     },
   },
+  // Asegurarse de que estas clases siempre estén incluidas
   safelist: [
-    'bg-netflixbg'  // Agregar explícitamente la clase que está causando problemas
+    'bg-netflixbg',
+    'text-netflixgray',
+    'bg-netflixred',
+    'text-netflixred'
   ],
   plugins: [],
-};
+}
