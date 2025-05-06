@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./utils/AuthContext.jsx";
 
@@ -6,8 +6,23 @@ function App() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const [scrolled, setScrolled] = useState(false);
+  
+  // Detectar scroll para cambiar el fondo del header
+  useEffect(() => {
+    if (isAuthPage) return;
+    
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 10;
+      if (isScrolled !== scrolled) {
+        setScrolled(isScrolled);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [scrolled, isAuthPage]);
   
   const handleLogout = () => {
     logout();
@@ -15,80 +30,123 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white flex flex-col">
+    <div className="min-h-screen bg-black text-white flex flex-col">
       {!isAuthPage && (
-        <header className="bg-[#1E1E1E] text-white py-3 shadow-lg border-b border-[#333333]">
-          <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <span className="bg-[#8B5CF6] text-white p-1 rounded">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                </svg>
-              </span>
-              <h1 className="text-2xl font-bold">
-                <span className="text-white">TeamG</span> 
-                <span className="text-[#8B5CF6]">Play</span>
-              </h1>
+        <header className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${scrolled ? 'bg-black' : 'bg-gradient-to-b from-black/80 to-transparent'}`}>
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center mr-10">
+                <span className="text-red-600 font-bold text-3xl mr-1">T</span>
+                <span className="text-white font-bold text-2xl">TeamG Play</span>
+              </Link>
+              
+              {user && (
+                <nav className="hidden md:flex space-x-6">
+                  <Link to="/" className="text-gray-300 hover:text-white transition">
+                    Inicio
+                  </Link>
+                  <Link to="/tv" className="text-gray-300 hover:text-white transition">
+                    TV en Vivo
+                  </Link>
+                  <Link to="/movies" className="text-gray-300 hover:text-white transition">
+                    Películas
+                  </Link>
+                  <Link to="/series" className="text-gray-300 hover:text-white transition">
+                    Series
+                  </Link>
+                </nav>
+              )}
             </div>
             
-            {user && (
-              <nav className="hidden md:flex space-x-6">
-                <Link to="/" className="text-gray-300 hover:text-white hover:underline transition-colors">
-                  Inicio
+            <div className="flex items-center space-x-4">
+              {user?.role === "admin" && (
+                <Link to="/admin" className="text-gray-300 hover:text-white transition">
+                  Admin
                 </Link>
-                <Link to="/" className="text-gray-300 hover:text-white hover:underline transition-colors">
-                  Películas
-                </Link>
-                <Link to="/" className="text-gray-300 hover:text-white hover:underline transition-colors">
-                  Series
-                </Link>
-                <Link to="/" className="text-gray-300 hover:text-white hover:underline transition-colors">
-                  TV en Vivo
-                </Link>
-                {user?.role === "admin" && (
-                  <Link to="/admin" className="text-gray-300 hover:text-white hover:underline transition-colors">
-                    Admin
-                  </Link>
-                )}
-                <button 
-                  onClick={handleLogout}
-                  className="bg-[#8B5CF6] px-4 py-1 rounded text-white hover:bg-[#7C3AED] transition-colors"
+              )}
+              
+              {user ? (
+                <div className="flex items-center">
+                  <div className="relative group">
+                    <button className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-md bg-red-600 flex items-center justify-center text-white">
+                        {user.username?.charAt(0).toUpperCase() || "U"}
+                      </div>
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </button>
+                    
+                    <div className="absolute right-0 mt-2 w-48 bg-black/90 border border-gray-800 rounded shadow-lg overflow-hidden scale-0 group-hover:scale-100 origin-top-right transition-transform duration-200 z-50">
+                      <div className="px-4 py-3 text-sm text-gray-300 border-b border-gray-800">
+                        <div className="font-medium">{user.username}</div>
+                      </div>
+                      <div className="py-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-red-600 hover:text-white transition"
+                        >
+                          Cerrar sesión
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Link 
+                  to="/login" 
+                  className="bg-red-600 px-4 py-1 rounded text-white hover:bg-red-700 transition"
                 >
-                  Salir
-                </button>
-              </nav>
-            )}
-            
-            {/* Versión móvil del menú */}
-            {user && (
-              <div className="md:hidden">
-                <button className="text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            
-            {!user && (
-              <Link 
-                to="/login" 
-                className="px-4 py-2 bg-[#8B5CF6] rounded-md hover:bg-[#7C3AED] transition-colors"
-              >
-                Iniciar Sesión
-              </Link>
-            )}
+                  Iniciar Sesión
+                </Link>
+              )}
+            </div>
           </div>
         </header>
       )}
       
-      <main className="flex-grow container mx-auto p-4">
+      <main className={`flex-grow ${!isAuthPage ? 'pt-16' : ''}`}>
         <Outlet />
       </main>
 
       {!isAuthPage && (
-        <footer className="bg-[#1E1E1E] text-center p-4 text-gray-400 border-t border-[#333333]">
-          <p>© {new Date().getFullYear()} TeamG Play - Todos los derechos reservados</p>
+        <footer className="bg-black text-gray-500 py-8 border-t border-gray-800">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row justify-between">
+              <div className="mb-6 md:mb-0">
+                <span className="text-red-600 font-bold text-2xl mr-1">T</span>
+                <span className="text-white font-bold text-xl">TeamG Play</span>
+                <p className="mt-2 max-w-md">La mejor plataforma de streaming para disfrutar de canales en vivo, películas y series.</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-6">
+                <div>
+                  <h3 className="text-white font-medium mb-2">Explorar</h3>
+                  <ul className="space-y-2">
+                    <li><Link to="/" className="hover:text-white transition">Inicio</Link></li>
+                    <li><Link to="/tv" className="hover:text-white transition">TV en Vivo</Link></li>
+                    <li><Link to="/movies" className="hover:text-white transition">Películas</Link></li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-white font-medium mb-2">Legal</h3>
+                  <ul className="space-y-2">
+                    <li><a href="#" className="hover:text-white transition">Términos</a></li>
+                    <li><a href="#" className="hover:text-white transition">Privacidad</a></li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-white font-medium mb-2">Contacto</h3>
+                  <ul className="space-y-2">
+                    <li><a href="#" className="hover:text-white transition">Soporte</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 border-t border-gray-800 pt-8 text-center">
+              <p>© {new Date().getFullYear()} TeamG Play. Todos los derechos reservados.</p>
+            </div>
+          </div>
         </footer>
       )}
     </div>
