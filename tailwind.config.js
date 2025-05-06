@@ -2,7 +2,7 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,jsx,ts,tsx}"
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
@@ -13,5 +13,8 @@ export default {
       },
     },
   },
+  safelist: [
+    'bg-netflixbg'  // Agregar explícitamente la clase que está causando problemas
+  ],
   plugins: [],
 };
