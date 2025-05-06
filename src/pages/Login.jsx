@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { login as loginService } from "../services/AuthService";
-import { useAuth } from "../utils/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export function Login() {
   const [username, setUsername] = useState("");

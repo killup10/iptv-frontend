@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "./utils/AuthContext.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 
 function App() {
   const { user, logout } = useAuth();
@@ -8,22 +8,40 @@ function App() {
   const navigate = useNavigate();
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
   const [scrolled, setScrolled] = useState(false);
-  
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   // Detectar scroll para cambiar el fondo del header
   useEffect(() => {
     if (isAuthPage) return;
-    
+
     const handleScroll = () => {
       const isScrolled = window.scrollY > 10;
       if (isScrolled !== scrolled) {
         setScrolled(isScrolled);
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [scrolled, isAuthPage]);
-  
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest("#user-menu")) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener("click", handleClickOutside);
+    } else {
+      document.removeEventListener("click", handleClickOutside);
+    }
+
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [dropdownOpen]);
+
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -39,45 +57,38 @@ function App() {
                 <span className="text-red-600 font-bold text-3xl mr-1">T</span>
                 <span className="text-white font-bold text-2xl">TeamG Play</span>
               </Link>
-              
+
               {user && (
                 <nav className="hidden md:flex space-x-6">
-                  <Link to="/" className="text-gray-300 hover:text-white transition">
-                    Inicio
-                  </Link>
-                  <Link to="/tv" className="text-gray-300 hover:text-white transition">
-                    TV en Vivo
-                  </Link>
-                  <Link to="/movies" className="text-gray-300 hover:text-white transition">
-                    Películas
-                  </Link>
-                  <Link to="/series" className="text-gray-300 hover:text-white transition">
-                    Series
-                  </Link>
+                  <Link to="/" className="text-gray-300 hover:text-white transition">Inicio</Link>
+                  <Link to="/tv" className="text-gray-300 hover:text-white transition">TV en Vivo</Link>
+                  <Link to="/movies" className="text-gray-300 hover:text-white transition">Películas</Link>
+                  <Link to="/series" className="text-gray-300 hover:text-white transition">Series</Link>
                 </nav>
               )}
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {user?.role === "admin" && (
-                <Link to="/admin" className="text-gray-300 hover:text-white transition">
-                  Admin
-                </Link>
+                <Link to="/admin" className="text-gray-300 hover:text-white transition">Admin</Link>
               )}
-              
+
               {user ? (
-                <div className="flex items-center">
-                  <div className="relative group">
-                    <button className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-md bg-red-600 flex items-center justify-center text-white">
-                        {user.username?.charAt(0).toUpperCase() || "U"}
-                      </div>
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                      </svg>
-                    </button>
-                    
-                    <div className="absolute right-0 mt-2 w-48 bg-black/90 border border-gray-800 rounded shadow-lg overflow-hidden scale-0 group-hover:scale-100 origin-top-right transition-transform duration-200 z-50">
+                <div className="relative" id="user-menu">
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center space-x-2"
+                  >
+                    <div className="w-8 h-8 rounded-md bg-red-600 flex items-center justify-center text-white">
+                      {user.username?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-black/90 border border-gray-800 rounded shadow-lg z-50">
                       <div className="px-4 py-3 text-sm text-gray-300 border-b border-gray-800">
                         <div className="font-medium">{user.username}</div>
                       </div>
@@ -90,13 +101,10 @@ function App() {
                         </button>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ) : (
-                <Link 
-                  to="/login" 
-                  className="bg-red-600 px-4 py-1 rounded text-white hover:bg-red-700 transition"
-                >
+                <Link to="/login" className="bg-red-600 px-4 py-1 rounded text-white hover:bg-red-700 transition">
                   Iniciar Sesión
                 </Link>
               )}
@@ -104,7 +112,7 @@ function App() {
           </div>
         </header>
       )}
-      
+
       <main className={`flex-grow ${!isAuthPage ? 'pt-16' : ''}`}>
         <Outlet />
       </main>
@@ -118,7 +126,7 @@ function App() {
                 <span className="text-white font-bold text-xl">TeamG Play</span>
                 <p className="mt-2 max-w-md">La mejor plataforma de streaming para disfrutar de canales en vivo, películas y series.</p>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-6">
                 <div>
                   <h3 className="text-white font-medium mb-2">Explorar</h3>
