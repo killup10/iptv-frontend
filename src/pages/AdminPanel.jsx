@@ -1,6 +1,6 @@
 // src/pages/AdminPanel.jsx
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../utils/AuthContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Tabs } from "../components/ui/tabs.jsx";
