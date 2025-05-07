@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
-import './index.css';                      // Tailwind + tus globales
+import './index.css';                      // Tailwind + global styles
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { Login } from './pages/Login.jsx';
@@ -10,18 +10,25 @@ import { Home } from './pages/Home.jsx';
 import { Watch } from './pages/Watch.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 import IPTVApp from './pages/IPTVApp.jsx';
-import PrivateRoute from './components/PrivateRoute.jsx';  // 🔒
+import PrivateRoute from './components/PrivateRoute.jsx';  // 🔒 Protected routes
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />,   // Aquí montamos Layout (Navbar + Outlet)
+    element: <App />,   // Layout (Navbar + Outlet)
     children: [
       { path: "/", element: <Home /> },
       { path: "/login", element: <Login /> },
-      { path: "/admin", element: <AdminPanel /> },
+      {
+        path: "/admin",
+        element: (
+          <PrivateRoute>
+            <AdminPanel />
+          </PrivateRoute>
+        ),
+      },
       { path: "/watch/:id", element: <Watch /> },
-      // Rutas protegidas:
+      // Rutas protegidas para contenido de usuario
       {
         path: "/tv",
         element: (
