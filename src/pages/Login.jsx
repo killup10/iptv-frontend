@@ -1,126 +1,93 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { login as loginService } from "../services/AuthService";
-import { useAuth } from "../context/AuthContext";
+// src/pages/Login.jsx
+import React, { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 
 export function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, user } = useAuth();
+  const from = location.state?.from || "/";
 
-  useEffect(() => {
-    if (user?.token) {
-      navigate(location.state?.from || "/");
-    }
-  }, [user, navigate, location]);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
 
-    try {
-      const deviceId = navigator.userAgent;
-      const { token, role } = await loginService(username, password, deviceId);
-      localStorage.setItem("token", token);
-      login({ username, token, role });
-      navigate("/");
-    } catch (err) {
-      setError(err.message || "Error al iniciar sesión. Intenta de nuevo.");
-    } finally {
-      setIsLoading(false);
+    if (!username || !password) {
+      setError("Por favor, completa todos los campos.");
+      return;
     }
+
+    const fakeToken = "123456";
+    const role = username === "admin" ? "admin" : "user";
+
+    login({ username, token: fakeToken, role });
+    navigate(from, { replace: true });
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-black bg-cover bg-center bg-no-repeat" 
-         style={{ 
-           backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)), url(https://source.unsplash.com/random/1920x1080?movie)' 
-         }}>
-        
-      <header className="py-6 px-12">
-        <div className="flex items-center">
-          <Link to="/" className="flex items-center">
-            <span className="text-red-600 font-bold text-4xl mr-1">T</span>
-            <span className="text-white font-bold text-2xl">TeamG Play</span>
-          </Link>
-        </div>
-      </header>
-      
-      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-black/80 p-8 sm:p-10 rounded-md w-full max-w-md">
-          <h2 className="text-3xl font-bold text-white mb-6">Iniciar sesión</h2>
-          
-          {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-600 rounded text-white text-sm">
-              {error}
-            </div>
-          )}
-          
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
-                Usuario
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                placeholder="Tu nombre de usuario"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                placeholder="Tu contraseña"
-              />
-            </div>
-            
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : null}
-                {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
-              </button>
-            </div>
-          </form>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
-              ¿No tienes una cuenta? 
-              <a href="#" className="ml-1 font-medium text-red-600 hover:text-red-500">
-                Contacta con el administrador
-              </a>
-            </p>
+    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+      <div className="w-full max-w-sm bg-zinc-900 p-8 rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold text-white text-center mb-6">
+          Iniciar sesión
+        </h2>
+
+        {error && (
+          <p className="text-red-500 text-sm mb-4 text-center">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            placeholder="Usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-4 py-2 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-netflixred"
+          />
+
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 pr-10 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-netflixred"
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-white"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "🙈" : "👁️"}
+            </button>
           </div>
-        </div>
-      </main>
+
+          <div className="flex items-center justify-between text-sm text-gray-400">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="mr-2"
+              />
+              Recordarme
+            </label>
+            <a href="#" className="hover:text-white">¿Olvidaste tu contraseña?</a>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-2 rounded bg-netflixred hover:bg-red-700 text-white font-medium transition duration-200"
+          >
+            Entrar
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

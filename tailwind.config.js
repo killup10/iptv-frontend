@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -7,18 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
+        netflixbg: "#141414",
         netflixgray: "#e5e5e5",
         netflixred: "#E50914",
-        netflixbg: "#141414",
       },
     },
   },
-  // Asegurarse de que estas clases siempre estén incluidas
-  safelist: [
-    'bg-netflixbg',
-    'text-netflixgray',
-    'bg-netflixred',
-    'text-netflixred'
-  ],
   plugins: [],
-}
+};

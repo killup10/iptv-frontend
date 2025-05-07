@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import Navbar from '../components/Navbar.jsx';
+import NavBar from '../components/NavBar.jsx';
 import Carousel from '../components/Carousel.jsx';
 import { fetchChannels, fetchMovies, fetchSeries } from '../utils/api.js';
 
@@ -50,7 +50,7 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-netflixbg text-netflixgray">
-      <Navbar />
+      <NavBar />
       <main className="pt-20">
         {/* Hero banner */}
         {hero && (
