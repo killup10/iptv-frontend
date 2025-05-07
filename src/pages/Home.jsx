@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import NavBar from '../components/NavBar.jsx';
 import Carousel from '../components/Carousel.jsx';
 import { fetchChannels, fetchMovies, fetchSeries } from '../utils/api.js';
 
@@ -34,61 +33,40 @@ export function Home() {
     loadData();
   }, []);
 
-  const onChannelClick = (channel) => navigate(`/watch/${channel.id}`);
-  const onMovieClick = (movie) => navigate(`/watch/${movie.id}`);
-  const onSeriesClick = (serie) => navigate(`/watch/${serie.id}`);
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-netflixbg">
-        <div className="w-16 h-16 border-4 border-netflixred border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  const hero = channels[0];
+  const onChannelClick = (channel) => navigate(`/watch/${channel.id}`);
+  const onMovieClick = (movie) => navigate(`/watch/${movie.id}`);
+  const onSeriesClick = (serie) => navigate(`/watch/${serie.id}`);
 
   return (
-    <div className="min-h-screen bg-netflixbg text-netflixgray">
-      <NavBar />
-      <main className="pt-20">
-        {/* Hero banner */}
-        {hero && (
-          <section className="relative h-[60vh] w-full overflow-hidden mb-8">
-            <img
-              src={hero.thumbnail}
-              alt={hero.name}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent"></div>
-            <div className="relative z-10 container mx-auto px-6 py-12">
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                {hero.name}
-              </h1>
-              <p className="text-lg text-gray-300 max-w-xl mb-6">
-                Disfruta de nuestro canal destacado en vivo.
-              </p>
-              <Link
-                to="/tv"
-                className="bg-netflixred hover:bg-red-700 text-white px-6 py-3 rounded-md font-medium"
-              >
-                Ver en Vivo
-              </Link>
-            </div>
-          </section>
-        )}
+    <div className="min-h-screen relative">
+      {/* Fondo blur */}
+      <div className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm" style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}></div>
 
-        {/* Carousels */}
-        {channels.length > 0 && (
+      <div className="relative z-10 max-w-screen-xl mx-auto pt-24 pb-16 text-center text-white px-4">
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">
+          Bienvenido a <span className="text-red-600">TeamG Play</span>
+        </h1>
+        <p className="text-lg max-w-2xl mx-auto text-gray-300">
+          Descubre los últimos estrenos, canales en vivo, películas y series disponibles en nuestra plataforma.
+        </p>
+      </div>
+
+      {/* Carouseles solo si hay usuario logueado */}
+      {user && (
+        <div className="relative z-10 max-w-screen-xl mx-auto px-4">
           <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
-        )}
-        {movies.length > 0 && (
           <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
-        )}
-        {series.length > 0 && (
           <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }
