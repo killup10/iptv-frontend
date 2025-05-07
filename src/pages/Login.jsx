@@ -11,82 +11,78 @@ export function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const API = import.meta.env.VITE_API_URL;
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
     if (!username || !password) {
       setError("Por favor, completa todos los campos.");
       return;
     }
 
-    const fakeToken = "123456";
-    const role = username === "admin" ? "admin" : "user";
+    try {
+      // Llamada real al backend
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error de autenticación");
 
-    login({ username, token: fakeToken, role });
-    navigate(from, { replace: true });
+      // data.user debe incluir { username, token, role }
+      login(data.user);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-zinc-900 p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-white text-center mb-6">
-          Iniciar sesión
-        </h2>
+    <div className="min-h-screen relative">
+      <div
+        className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
+        style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
+      />
 
-        {error && (
-          <p className="text-red-500 text-sm mb-4 text-center">{error}</p>
-        )}
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
+        <div className="w-full max-w-sm bg-zinc-900/90 p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-white text-center mb-6">
+            Iniciar sesión
+          </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-2 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-netflixred"
-          />
+          {error && (
+            <p className="text-red-500 text-sm mb-4 text-center">{error}</p>
+          )}
 
-          <div className="relative">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <input
-              type={showPassword ? "text" : "password"}
+              type="text"
+              placeholder="Usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-pink-500"
+            />
+
+            <input
+              type="password"
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 pr-10 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-netflixred"
+              className="w-full px-4 py-2 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none focus:ring-2 focus:ring-pink-500"
             />
+
             <button
-              type="button"
-              className="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-white"
-              onClick={() => setShowPassword(!showPassword)}
+              type="submit"
+              className="w-full py-2 rounded bg-red-600 hover:bg-red-700 text-white font-medium transition duration-200"
             >
-              {showPassword ? "🙈" : "👁️"}
+              Entrar
             </button>
-          </div>
-
-          <div className="flex items-center justify-between text-sm text-gray-400">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="mr-2"
-              />
-              Recordarme
-            </label>
-            <a href="#" className="hover:text-white">¿Olvidaste tu contraseña?</a>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2 rounded bg-netflixred hover:bg-red-700 text-white font-medium transition duration-200"
-          >
-            Entrar
-          </button>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
