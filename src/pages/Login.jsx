@@ -24,7 +24,6 @@ export function Login() {
     }
 
     try {
-      // Llamada real al backend
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,8 +32,12 @@ export function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error de autenticación");
 
-      // data.user debe incluir { username, token, role }
-      login(data.user);
+      // Guardar usuario con token y role
+      login({
+        username: data.user.username,
+        role: data.user.role,
+        token: data.token,
+      });
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message);
