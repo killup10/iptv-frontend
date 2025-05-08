@@ -1,32 +1,27 @@
+// src/utils/api.js
+const API = import.meta.env.VITE_API_URL;
+const token = localStorage.getItem("token");
+const headers = { Authorization: `Bearer ${token}` };
+
 export async function fetchChannels() {
-    const res = await fetch('/api/live-channels');
-    if (!res.ok) throw new Error('Error al cargar canales');
-    const data = await res.json();
-    return data.map(({ id, name, logoUrl }) => ({
-      id,
-      name,
-      thumbnail: logoUrl,
-    }));
-  }
-  
-  export async function fetchMovies() {
-    const res = await fetch('/api/movies');
-    if (!res.ok) throw new Error('Error al cargar películas');
-    const data = await res.json();
-    return data.map(({ id, title, posterUrl }) => ({
-      id,
-      name: title,
-      thumbnail: posterUrl,
-    }));
-  }
-  
-  export async function fetchSeries() {
-    const res = await fetch('/api/series');
-    if (!res.ok) throw new Error('Error al cargar series');
-    const data = await res.json();
-    return data.map(({ id, title, posterUrl }) => ({
-      id,
-      name: title,
-      thumbnail: posterUrl,
-    }));
-  }
+  const res = await fetch(`${API}/api/channels/list`, { headers });
+  return res.json(); // ya viene [{id,name,thumbnail,url},...]
+}
+
+export async function fetchMovies() {
+  const res = await fetch(`${API}/api/videos`, { headers });
+  const data = await res.json();
+  // filtra solo tipo 'pelicula' y mapea
+  return data
+    .filter(v => v.tipo === "pelicula")
+    .map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url }));
+}
+
+export async function fetchSeries() {
+  const res = await fetch(`${API}/api/videos`, { headers });
+  const data = await res.json();
+  // filtra solo tipo 'serie' y mapea
+  return data
+    .filter(v => v.tipo === "serie")
+    .map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url }));
+}
