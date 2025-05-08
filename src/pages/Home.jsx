@@ -48,7 +48,10 @@ export function Home() {
   return (
     <div className="min-h-screen relative">
       {/* Fondo blur */}
-      <div className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm" style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}></div>
+      <div
+        className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
+        style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
+      />
 
       <div className="relative z-10 max-w-screen-xl mx-auto pt-24 pb-16 text-center text-white px-4">
         <h1 className="text-4xl md:text-5xl font-bold mb-4">
@@ -59,14 +62,12 @@ export function Home() {
         </p>
       </div>
 
-      {/* Carouseles solo si hay usuario logueado */}
-      {user && (
-        <div className="relative z-10 max-w-screen-xl mx-auto px-4">
-          <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
-          <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
-          <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
-        </div>
-      )}
+      {/* Carouseles siempre visibles */}
+      <div className="relative z-10 max-w-screen-xl mx-auto px-4">
+        <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
+        <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
+        <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
+      </div>
     </div>
   );
 }
