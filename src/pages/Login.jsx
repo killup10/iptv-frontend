@@ -13,7 +13,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const API = import.meta.env.VITE_API_URL;
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+  const loginEndpoint = `${baseUrl}/api/auth/login`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,20 +25,26 @@ export function Login() {
     }
 
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
+      const res = await fetch(loginEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Respuesta no JSON: ${text.substring(0, 100)}`);
+      }
       if (!res.ok) throw new Error(data.error || "Error de autenticación");
 
-      // Guardar usuario con token y role
-      login({
-        username: data.user.username,
-        role: data.user.role,
-        token: data.token,
-      });
+      // Compatible con respuestas { user:{...}, token } o { username, role, token }
+      const userPayload = data.user
+        ? { username: data.user.username, role: data.user.role, token: data.token }
+        : { username: data.username, role: data.role, token: data.token };
+
+      login(userPayload);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message);
