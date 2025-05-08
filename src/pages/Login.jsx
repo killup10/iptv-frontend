@@ -1,3 +1,5 @@
+# Reemplazar src/pages/Login.jsx con la versión corregida
+cat > src/pages/Login.jsx << 'EOF'
 // src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -46,10 +48,11 @@ export function Login() {
 
   return (
     <div className="min-h-screen relative">
+      {/* Fondo con blur */}
       <div
         className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
         style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
-      />
+      ></div>
 
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="w-full max-w-sm bg-zinc-900/90 p-8 rounded-lg shadow-md">
