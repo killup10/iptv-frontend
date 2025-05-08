@@ -1,5 +1,3 @@
-# Reemplazar src/pages/Login.jsx con la versión corregida
-cat > src/pages/Login.jsx << 'EOF'
 // src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
