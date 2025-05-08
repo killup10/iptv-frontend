@@ -44,7 +44,7 @@ export default function AdminPanel() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API}/api/m3u/upload`, {
+      const res = await fetch(`${API}/api/m3u/upload-m3u`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ fileName: m3uName, content: m3uContent }),

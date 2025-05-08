@@ -6,7 +6,7 @@ function App() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const isAuthPage = location.pathname.startsWith("/login") || location.pathname.startsWith("/register");
   const [scrolled, setScrolled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -54,8 +54,10 @@ function App() {
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center">
               <Link to="/" className="flex items-center mr-10">
-                <span className="text-red-600 font-bold text-3xl mr-1">T</span>
-                <span className="text-white font-bold text-2xl">TeamG Play</span>
+              <span className="text-white font-bold text-2xl">
+  <span className="text-red-600">T</span>eamG Play
+</span>
+
               </Link>
 
               {user && (
@@ -124,7 +126,7 @@ function App() {
               <div className="mb-6 md:mb-0">
                 <span className="text-red-600 font-bold text-2xl mr-1">T</span>
                 <span className="text-white font-bold text-xl">TeamG Play</span>
-                <p className="mt-2 max-w-md">La mejor plataforma de streaming para disfrutar de canales en vivo, películas y series.</p>
+                <p className="mt-2 max-w-md">La mejor plataforma de streaming para disfrutar de canales en vivo, películas, series y mas.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-6">
@@ -133,7 +135,7 @@ function App() {
                   <ul className="space-y-2">
                     <li><Link to="/" className="hover:text-white transition">Inicio</Link></li>
                     <li><Link to="/tv" className="hover:text-white transition">TV en Vivo</Link></li>
-                    <li><Link to="/movies" className="hover:text-white transition">Películas</Link></li>
+                    <li><Link to="/movies" className="hover:text-white transition">VOD</Link></li>
                   </ul>
                 </div>
                 <div>
