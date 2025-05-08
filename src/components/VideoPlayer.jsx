@@ -1,33 +1,31 @@
 // src/components/VideoPlayer.jsx
-import React, { useRef, useEffect } from "react";
-import Hls from "hls.js";
+import React from "react";
+import ReactPlayer from "react-player";
 
 export function VideoPlayer({ url, support4K = false }) {
-  const videoRef = useRef();
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !url) return;
-
-    // si el navegador no soporta nativamente HLS (.m3u8)
-    if (Hls.isSupported()) {
-      const hls = new Hls({ capLevelToPlayerSize: true, maxBufferLength: support4K ? 30 : 10 });
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      return () => hls.destroy();
-    }
-
-    // Safari u otros que sí soportan HLS nativo
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = url;
-    }
-  }, [url, support4K]);
-
   return (
-    <video
-      ref={videoRef}
-      controls
-      className="w-full max-h-[70vh] bg-black rounded"
-    />
+    <div className="player-wrapper relative pt-[56.25%]"> 
+      {/* 16:9 aspect ratio */}
+      <ReactPlayer
+        url={url}
+        controls
+        width="100%"
+        height="100%"
+        style={{ position: "absolute", top: 0, left: 0 }}
+        config={{
+          file: {
+            attributes: {
+              // permitimos buffers más grandes si es 4K
+              preload: "auto",
+            },
+            hlsOptions: {
+              maxBufferLength: support4K ? 30 : 10,
+            },
+          },
+        }}
+      />
+    </div>
   );
 }
+
+export default VideoPlayer;
