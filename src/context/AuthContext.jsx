@@ -8,18 +8,22 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
-    if (stored) {
-      setUser(JSON.parse(stored));
+    const token = localStorage.getItem("token");
+    if (stored && token) {
+      setUser({ ...JSON.parse(stored), token });
     }
   }, []);
 
-  const login = (userData) => {
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
+  const login = ({ username, role, token }) => {
+    // Guardamos por separado
+    localStorage.setItem("user", JSON.stringify({ username, role }));
+    localStorage.setItem("token", token);
+    setUser({ username, role, token });
   };
 
   const logout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     setUser(null);
   };
 
@@ -30,7 +34,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Hook para usar el contexto
 export function useAuth() {
   return useContext(AuthContext);
 }
