@@ -1,7 +1,7 @@
 // src/pages/Watch.jsx
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { VideoPlayer } from "../components/VideoPlayer";
+import  VideoPlayer  from "../components/VideoPlayer.jsx";
 import axios from "axios";
 
 export function Watch() {
