@@ -1,48 +1,59 @@
 // src/components/VideoPlayer.jsx
 import React, { useRef, useEffect, useState } from "react";
-import shaka from 'shaka-player';
+import Hls from "hls.js";
+import shaka from "shaka-player";
 
-export function VideoPlayer({ url }) {
+export default function VideoPlayer({ url }) {
   const videoRef = useRef(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !url) return;
+    setError("");
 
-    // Instalar polyfills
-    shaka.polyfill.installAll();
+    let hls = null;
+    let shakaPlayer = null;
 
-    let player;
-    async function initPlayer() {
-      if (shaka.Player.isBrowserSupported()) {
-        player = new shaka.Player(video);
-        player.getNetworkingEngine().registerRequestFilter((type, request) => {
-          // Opcional: Puedes agregar headers o proxy aquí
+    // 1) Si es .m3u8 → HLS.js
+    if (url.endsWith(".m3u8")) {
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          console.error("Hls.js Error:", data);
+          setError("Error HLS: " + data.type);
         });
-        try {
-          await player.load(url);
-        } catch (err) {
-          console.error('Error cargando stream con Shaka:', err);
-          setError('No se pudo reproducir el video. Verifique la URL o su conexión.');
-        }
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = url;
+        video.addEventListener("error", () => setError("Error reproducción HLS nativa"));
       } else {
-        // Fallback nativo HLS
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = url;
-          video.addEventListener('error', () => {
-            setError('Error al reproducir el video nativamente.');
-          });
-        } else {
-          setError('Su navegador no soporta reproducción de video.');
-        }
+        setError("HLS no soportado");
       }
+
+    // 2) Si es .mpd → DASH con Shaka
+    } else if (url.endsWith(".mpd")) {
+      shaka.polyfill.installAll();
+      if (shaka.Player.isBrowserSupported()) {
+        shakaPlayer = new shaka.Player(video);
+        shakaPlayer.load(url).catch(err => {
+          console.error("Shaka Error:", err);
+          setError("Error reproducción DASH");
+        });
+      } else {
+        setError("Shaka no soportado");
+      }
+
+    // 3) Cualquier otro (mp4, mkv, etc) → HTML5 nativo
+    } else {
+      video.src = url;
+      video.addEventListener("error", () => setError("Error reproducción nativa de vídeo"));
     }
 
-    initPlayer();
-
     return () => {
-      if (player) player.destroy();
+      if (hls) hls.destroy();
+      if (shakaPlayer) shakaPlayer.destroy();
     };
   }, [url]);
 
@@ -62,5 +73,3 @@ export function VideoPlayer({ url }) {
     />
   );
 }
-
-export default VideoPlayer;
