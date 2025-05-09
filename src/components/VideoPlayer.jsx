@@ -1,59 +1,52 @@
 // src/components/VideoPlayer.jsx
-import React, { useRef, useEffect, useState } from "react";
-import Hls from "hls.js";
-import shaka from "shaka-player";
+import React, { useRef, useEffect, useState } from 'react';
+import Hls from 'hls.js';
 
 export default function VideoPlayer({ url }) {
   const videoRef = useRef(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!url) return;
     const video = videoRef.current;
-    if (!video || !url) return;
-    setError("");
+    setError(null);
 
-    let hls = null;
-    let shakaPlayer = null;
+    // Construir URL a través del proxy para esquivar CORS en HLS
+    const sourceUrl = url.endsWith('.m3u8')
+      ? `${import.meta.env.VITE_API_URL.replace(/\/${'$'}/, '')}/proxy?url=${encodeURIComponent(url)}`
+      : url;
 
-    // 1) Si es .m3u8 → HLS.js
-    if (url.endsWith(".m3u8")) {
+    let hls;
+
+    if (url.endsWith('.m3u8')) {
       if (Hls.isSupported()) {
         hls = new Hls();
-        hls.loadSource(url);
+        hls.loadSource(sourceUrl);
         hls.attachMedia(video);
-        hls.on(Hls.Events.ERROR, (_e, data) => {
-          console.error("Hls.js Error:", data);
-          setError("Error HLS: " + data.type);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
         });
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        video.addEventListener("error", () => setError("Error reproducción HLS nativa"));
-      } else {
-        setError("HLS no soportado");
-      }
-
-    // 2) Si es .mpd → DASH con Shaka
-    } else if (url.endsWith(".mpd")) {
-      shaka.polyfill.installAll();
-      if (shaka.Player.isBrowserSupported()) {
-        shakaPlayer = new shaka.Player(video);
-        shakaPlayer.load(url).catch(err => {
-          console.error("Shaka Error:", err);
-          setError("Error reproducción DASH");
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.error('Hls.js Error:', data);
+          setError(`Error HLS: ${data.type}`);
         });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = sourceUrl;
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(() => {});
+        });
+        video.addEventListener('error', () => setError('Error nativo HLS'));
       } else {
-        setError("Shaka no soportado");
+        setError('HLS no soportado en este navegador');
       }
-
-    // 3) Cualquier otro (mp4, mkv, etc) → HTML5 nativo
     } else {
-      video.src = url;
-      video.addEventListener("error", () => setError("Error reproducción nativa de vídeo"));
+      video.src = sourceUrl;
+      video.autoplay = true;
+      video.addEventListener('error', () => setError('Error al reproducir video'));
     }
 
     return () => {
       if (hls) hls.destroy();
-      if (shakaPlayer) shakaPlayer.destroy();
     };
   }, [url]);
 
