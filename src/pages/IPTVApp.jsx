@@ -3,9 +3,15 @@ import React, { useEffect, useState } from 'react';
 import VideoPlayer from '../components/VideoPlayer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Proxya URLs HLS para evitar CORS
+function withProxy(url) {
+  return url && url.endsWith('.m3u8')
+    ? `/proxy?url=${encodeURIComponent(url)}`
+    : url;
+}
+
 export default function IPTVApp({ defaultTab = 'live' }) {
   const { user } = useAuth();
-  const [m3uFiles, setM3uFiles] = useState([]);
   const [channels, setChannels] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
   const [search, setSearch] = useState('');
@@ -13,8 +19,6 @@ export default function IPTVApp({ defaultTab = 'live' }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [categories] = useState(['Todos', 'Deportes', 'Noticias', 'Entretenimiento', 'Películas']);
-  const [activeCategory, setActiveCategory] = useState('Todos');
 
   const API_URL = import.meta.env.VITE_API_URL;
   const { token } = user || {};
@@ -23,18 +27,14 @@ export default function IPTVApp({ defaultTab = 'live' }) {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    if (activeTab === 'live') {
-      loadChannels();
-      loadM3UFiles();
-    } else {
-      loadVideos();
-    }
+    if (activeTab === 'live') loadChannels();
+    else loadVideos();
   }, [activeTab]);
 
-  const loadChannels = async () => {
+  async function loadChannels() {
     try {
       const res = await fetch(`${API_URL}/api/channels/list`, { headers: authHeader });
-      if (!res.ok) throw new Error('Error al cargar canales');
+      if (!res.ok) throw new Error('Error cargando canales');
       const data = await res.json();
       setChannels(data);
     } catch (err) {
@@ -42,23 +42,12 @@ export default function IPTVApp({ defaultTab = 'live' }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const loadM3UFiles = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/m3u/list`, { headers: authHeader });
-      if (!res.ok) throw new Error('Error al cargar archivos M3U');
-      const data = await res.json();
-      setM3uFiles(data.files || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const loadVideos = async () => {
+  async function loadVideos() {
     try {
       const res = await fetch(`${API_URL}/api/videos`, { headers: authHeader });
-      if (!res.ok) throw new Error('Error al cargar videos');
+      if (!res.ok) throw new Error('Error cargando videos');
       const data = await res.json();
       setVideoFiles(data);
     } catch (err) {
@@ -66,15 +55,14 @@ export default function IPTVApp({ defaultTab = 'live' }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   const filteredChannels = channels.filter(c =>
-    (activeCategory === 'Todos' || c.category === activeCategory) &&
     c.name.toLowerCase().includes(search.toLowerCase())
   );
-
-  const filteredM3U = m3uFiles.filter(f => f.toLowerCase().includes(search.toLowerCase()));
-  const filteredVideos = videoFiles.filter(v => v.title.toLowerCase().includes(search.toLowerCase()));
+  const filteredVideos = videoFiles.filter(v =>
+    v.title.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (!user) return <p className="p-4 text-center">Debes iniciar sesión para acceder.</p>;
 
@@ -131,8 +119,8 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           ) : activeTab === 'live' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredChannels.map(c => (
-                <div key={c._id} onClick={() => setSelectedVideo(c.url)} className="cursor-pointer">
-                  <img src={c.logo} alt={c.name} className="w-full h-32 object-cover rounded" />
+                <div key={c.id} onClick={() => setSelectedVideo(withProxy(c.url))} className="cursor-pointer rounded overflow-hidden">
+                  <img src={c.thumbnail} alt={c.name} className="w-full h-32 object-cover" />
                   <p className="mt-2 truncate">{c.name}</p>
                 </div>
               ))}
@@ -140,15 +128,16 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredVideos.map(v => (
-                <div key={v._id} onClick={() => setSelectedVideo(v.url)} className="cursor-pointer">
+                <div key={v._id} onClick={() => setSelectedVideo(v.url)} className="cursor-pointer rounded overflow-hidden">
                   <div className="aspect-video bg-gray-800 flex items-center justify-center rounded">
-                    🎬
+                    <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
                   </div>
                   <p className="mt-2 truncate">{v.title}</p>
                 </div>
               ))}
             </div>
           )}
+          {error && <p className="mt-4 text-center text-red-500">{error}</p>}
         </div>
       )}
     </div>
