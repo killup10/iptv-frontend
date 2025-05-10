@@ -1,19 +1,20 @@
 // src/pages/IPTVApp.jsx
 import React, { useEffect, useState } from 'react';
-import VideoPlayer from '../components/VideoPlayer.jsx'; // Asegúrate que este componente es robusto
+import VideoPlayer from '../components/VideoPlayer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function IPTVApp({ defaultTab = 'live' }) {
+  // ... (otros estados y hooks como estaban: user, channels, videoFiles, etc.)
   const { user } = useAuth();
   const [channels, setChannels] = useState([]);
   const [videoFiles, setVideoFiles] = useState([]);
   const [search, setSearch] = useState('');
-  const [selectedVideoUrl, setSelectedVideoUrl] = useState(null); // Almacenará la URL original
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState(null);
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = import.meta.env.VITE_API_URL; // URL de tu backend Node.js
+  const API_URL = import.meta.env.VITE_API_URL;
   const { token } = user || {};
   const authHeader = { Authorization: `Bearer ${token}` };
 
@@ -25,10 +26,10 @@ export default function IPTVApp({ defaultTab = 'live' }) {
     } else {
       loadVideos();
     }
-  }, [activeTab, user]); // Agregado user por si el token cambia
+  }, [activeTab, user]);
 
   async function loadChannels() {
-    if (!token) { // No cargar si no hay token
+    if (!token) {
       setIsLoading(false);
       setChannels([]);
       return;
@@ -40,18 +41,19 @@ export default function IPTVApp({ defaultTab = 'live' }) {
         throw new Error(`Error cargando canales: ${res.status} ${errorData}`);
       }
       const data = await res.json();
-      setChannels(data || []); // Asegurar que sea un array
+      console.log('IPTVApp: Canales cargados de /api/channels/list:', data);
+      setChannels(data || []);
     } catch (err) {
       console.error("Error en loadChannels:", err);
       setError(err.message);
-      setChannels([]); // Limpiar en caso de error
+      setChannels([]);
     } finally {
       setIsLoading(false);
     }
   }
 
   async function loadVideos() {
-    if (!token) { // No cargar si no hay token
+    if (!token) {
       setIsLoading(false);
       setVideoFiles([]);
       return;
@@ -63,55 +65,65 @@ export default function IPTVApp({ defaultTab = 'live' }) {
         throw new Error(`Error cargando videos: ${res.status} ${errorData}`);
       }
       const data = await res.json();
-      setVideoFiles(data || []); // Asegurar que sea un array
+      setVideoFiles(data || []);
     } catch (err) {
       console.error("Error en loadVideos:", err);
       setError(err.message);
-      setVideoFiles([]); // Limpiar en caso de error
+      setVideoFiles([]);
     } finally {
       setIsLoading(false);
     }
   }
-
-  // Función para determinar la URL final para el reproductor
+  
   function getPlayableUrl(originalUrl) {
     if (!originalUrl) {
       console.warn("getPlayableUrl recibió una URL nula o undefined");
       return originalUrl;
     }
+    console.log("IPTVApp: getPlayableUrl - evaluando originalUrl:", originalUrl);
 
     // 1. URLs que ya usan tu dominio teamg.store (manejadas por tu Cloudflare Worker)
-    //    Estas se reproducen directamente.
     if (originalUrl.startsWith('https://teamg.store/')) {
-      console.log(`Reproduciendo directamente (URL de teamg.store): ${originalUrl}`);
+      console.log(`   সিদ্ধান্ত: Reproduciendo directamente (URL de teamg.store): ${originalUrl}`);
       return originalUrl;
     }
 
-    // 2. URLs que necesitan pasar por el proxy de tu backend Node.js
-    //    (canales M3U8, MKV/MP4 directos de Dropbox u otras fuentes no-teamg.store)
+    // 2. TEST: URLs de Bitel (como la de Latina) se intentarán reproducir directamente
+    if (originalUrl.startsWith('https://live-evg25.tv360.bitel.com.pe/')) {
+      console.log(`  TEST: Reproduciendo directamente URL de Bitel (sin proxy Node.js): ${originalUrl}`);
+      return originalUrl;
+    }
+
+    // 3. NUEVO TEST: URLs de 179.51.136.19 se intentarán reproducir directamente
+    if (originalUrl.startsWith('http://179.51.136.19')) {
+      console.log(`  TEST: Reproduciendo directamente URL de 179.51.136.19 (sin proxy Node.js): ${originalUrl}`);
+      return originalUrl;
+    }
+
+    // 4. URLs que necesitan pasar por el proxy de tu backend Node.js
+    //    (canales M3U8 de otras fuentes, MKV/MP4 directos de Dropbox u otras fuentes no manejadas arriba)
     if (originalUrl.match(/\.(m3u8|mp4|mkv)(\?|$)/i)) {
       const encodedUrl = encodeURIComponent(originalUrl);
       const proxiedUrl = `${API_URL}/proxy?url=${encodedUrl}`;
-      console.log(`Reproduciendo vía proxy del backend Node.js: ${proxiedUrl} (Original: ${originalUrl})`);
+      console.log(`   সিদ্ধান্ত: Reproduciendo vía proxy del backend Node.js: ${proxiedUrl} (Original: ${originalUrl})`);
       return proxiedUrl;
     }
 
-    // 3. Otros tipos de URL (si los hubiera) - reproducir directamente por defecto
-    console.log(`Reproduciendo directamente (otro tipo de URL): ${originalUrl}`);
+    // 5. Otros tipos de URL (si los hubiera) - reproducir directamente por defecto
+    console.log(`   সিদ্ধান্ত: Reproduciendo directamente (otro tipo de URL): ${originalUrl}`);
     return originalUrl;
   }
 
   const handleSelectVideo = (urlOriginal) => {
     if (!urlOriginal) {
-      console.error("Se intentó seleccionar un video con URL undefined!");
+      console.error("IPTVApp: Se intentó seleccionar un video con URL undefined!");
       setError("La URL del video seleccionado no es válida.");
       setSelectedVideoUrl(null);
       return;
     }
-    console.log("URL original seleccionada:", urlOriginal);
-    setSelectedVideoUrl(urlOriginal); // Guardamos la URL original cruda
+    console.log("IPTVApp: handleSelectVideo - urlOriginal seleccionada:", urlOriginal);
+    setSelectedVideoUrl(urlOriginal);
   };
-
 
   const filteredChannels = Array.isArray(channels) ? channels.filter(c =>
     c && c.name && c.name.toLowerCase().includes(search.toLowerCase())
@@ -123,12 +135,15 @@ export default function IPTVApp({ defaultTab = 'live' }) {
 
   if (!user) return <p className="p-4 text-center">Debes iniciar sesión para acceder.</p>;
 
-  // Preparamos la URL para el VideoPlayer solo si hay una selectedVideoUrl
   const finalUrlForPlayer = selectedVideoUrl ? getPlayableUrl(selectedVideoUrl) : null;
+  if (selectedVideoUrl && finalUrlForPlayer) {
+      console.log("IPTVApp: URL final para VideoPlayer:", finalUrlForPlayer);
+  }
 
+  // ... (el resto de tu JSX para renderizar, sin cambios)
   return (
     <div className="min-h-screen bg-black text-white">
-      {finalUrlForPlayer ? ( // Usamos finalUrlForPlayer para decidir si mostrar el reproductor
+      {finalUrlForPlayer ? (
         <div className="p-4">
           <button onClick={() => setSelectedVideoUrl(null)} className="mb-4 text-gray-400 hover:text-white">
             ← Volver
@@ -181,14 +196,13 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           ) : activeTab === 'live' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredChannels.length > 0 ? filteredChannels.map(c => {
-                // **Importante: Asegúrate que 'c.url' y 'c.thumbnail' existen y son válidos**
                 if (!c || !c.url) {
                   console.warn("Canal sin URL:", c);
-                  return null; // O mostrar un placeholder
+                  return null; 
                 }
                 return (
                   <div key={c.id || c._id} onClick={() => handleSelectVideo(c.url)} className="cursor-pointer rounded overflow-hidden">
-                    <img src={c.thumbnail || '/placeholder-thumbnail.png'} alt={c.name || 'Canal sin nombre'} className="w-full h-32 object-cover" />
+                    <img src={c.thumbnail || c.logo || '/placeholder-thumbnail.png'} alt={c.name || 'Canal sin nombre'} className="w-full h-32 object-cover" />
                     <p className="mt-2 truncate">{c.name || 'Canal sin nombre'}</p>
                   </div>
                 );
@@ -197,10 +211,9 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredVideos.length > 0 ? filteredVideos.map(v => {
-                // **Importante: Asegúrate que 'v.url' y 'v.thumbnail' existen y son válidos**
                  if (!v || !v.url) {
                   console.warn("Video sin URL:", v);
-                  return null; // O mostrar un placeholder
+                  return null; 
                 }
                 return (
                   <div key={v._id} onClick={() => handleSelectVideo(v.url)} className="cursor-pointer rounded overflow-hidden">
@@ -213,7 +226,6 @@ export default function IPTVApp({ defaultTab = 'live' }) {
               }) : <p>No hay películas disponibles.</p>}
             </div>
           )}
-          {/* El error general ya se muestra arriba si isLoading es false */}
         </div>
       )}
     </div>
