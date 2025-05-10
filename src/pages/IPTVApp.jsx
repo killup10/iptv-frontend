@@ -3,10 +3,13 @@ import React, { useEffect, useState } from 'react';
 import VideoPlayer from '../components/VideoPlayer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-// Proxya URLs HLS para evitar CORS
+// Proxya URLs HLS o video para evitar CORS
 function withProxy(url) {
-  return url && url.endsWith('.m3u8')
-    ? `/proxy?url=${encodeURIComponent(url)}`
+  if (!url) return url;
+  const encoded = encodeURIComponent(url);
+  // Proxy solo para .m3u8 y videos (mp4, mkv)
+  return url.match(/\.(m3u8|mp4|mkv)(\?|$)/i)
+    ? `/proxy?url=${encoded}`
     : url;
 }
 
@@ -73,7 +76,7 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           <button onClick={() => setSelectedVideo(null)} className="mb-4 text-gray-400 hover:text-white">
             ← Volver
           </button>
-          <VideoPlayer url={selectedVideo} />
+          <VideoPlayer url={withProxy(selectedVideo)} />
         </div>
       ) : (
         <div className="container mx-auto px-4 py-8">
@@ -119,7 +122,7 @@ export default function IPTVApp({ defaultTab = 'live' }) {
           ) : activeTab === 'live' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredChannels.map(c => (
-                <div key={c.id} onClick={() => setSelectedVideo(withProxy(c.url))} className="cursor-pointer rounded overflow-hidden">
+                <div key={c.id} onClick={() => setSelectedVideo(c.url)} className="cursor-pointer rounded overflow-hidden">
                   <img src={c.thumbnail} alt={c.name} className="w-full h-32 object-cover" />
                   <p className="mt-2 truncate">{c.name}</p>
                 </div>
