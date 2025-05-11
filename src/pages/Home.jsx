@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Carousel from '../components/Carousel.jsx';
-// IMPORTANTE: Asegúrate que tu api.js exporte estas funciones para contenido PÚBLICO
+// IMPORTAMOS LAS FUNCIONES CORRECTAS QUE SÍ ESTÁN EXPORTADAS EN TU ÚLTIMO api.js
 import { 
   fetchFeaturedChannels, 
-  fetchFeaturedPublicContent // Esta debería devolver { movies: [...], series: [...] }
+  fetchFeaturedMovies,
+  fetchFeaturedSeries 
 } from '../utils/api.js';
 
 export function Home() {
@@ -21,12 +22,15 @@ export function Home() {
     async function loadData() {
       setLoading(true);
       try {
+        // Usamos las funciones importadas correctamente
         const channelsData = await fetchFeaturedChannels();
-        setFeaturedChannels(channelsData ? channelsData.slice(0, 10) : []); // Mostrar solo algunos
+        setFeaturedChannels(channelsData ? channelsData.slice(0, 10) : []);
 
-        const publicContent = await fetchFeaturedPublicContent(); // Espera { movies: [...], series: [...] }
-        setFeaturedMovies(publicContent.movies ? publicContent.movies.slice(0, 10) : []);
-        setFeaturedSeries(publicContent.series ? publicContent.series.slice(0, 10) : []);
+        const moviesData = await fetchFeaturedMovies();
+        setFeaturedMovies(moviesData ? moviesData.slice(0, 10) : []);
+        
+        const seriesData = await fetchFeaturedSeries();
+        setFeaturedSeries(seriesData ? seriesData.slice(0, 10) : []);
 
       } catch (err) {
         console.error('Error cargando datos destacados para Home:', err);
@@ -63,7 +67,7 @@ export function Home() {
       <div className="relative h-[70vh] md:h-[80vh] flex flex-col items-center justify-center text-center px-4">
         <div
           className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
-          style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
+          style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }} // Asegúrate que esta imagen esté en /public
         />
         <div className="relative z-10">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 text-white">
