@@ -14,9 +14,12 @@ export default function AdminPanel() {
   const [m3uFile, setM3uFile] = useState(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [videoThumb, setVideoThumb] = useState("");
   const [channelName, setChannelName] = useState("");
   const [channelUrl, setChannelUrl] = useState("");
+  const [channelLogo, setChannelLogo] = useState("");
   const [channels, setChannels] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,19 +27,16 @@ export default function AdminPanel() {
 
   const API = import.meta.env.VITE_API_URL;
 
-  // Carga lista de canales cuando abres la pestaña "Canales"
   useEffect(() => {
     if (activeTab === "channels") fetchChannels();
+    if (activeTab === "vod") fetchVideos();
   }, [activeTab]);
 
   const fetchChannels = async () => {
     try {
       const res = await fetch(`${API}/api/channels/list`, { headers: authHeader });
       const text = await res.text();
-      // si recibimos HTML (login) en vez de JSON, lanzamos error
-      if (!res.ok || text.trim().startsWith("<!DOCTYPE")) {
-        throw new Error("Token inválido o sesión expirada");
-      }
+      if (!res.ok || text.trim().startsWith("<!DOCTYPE")) throw new Error("Token inválido o sesión expirada");
       const data = JSON.parse(text);
       setChannels(data);
     } catch (err) {
@@ -44,12 +44,19 @@ export default function AdminPanel() {
     }
   };
 
+  const fetchVideos = async () => {
+    try {
+      const res = await fetch(`${API}/api/videos`, { headers: authHeader });
+      const data = await res.json();
+      setVideos(data);
+    } catch (err) {
+      setErrorMsg(err.message);
+    }
+  };
+
   const submitM3u = async (e) => {
     e.preventDefault();
-    if (!m3uFile) {
-      setErrorMsg("Selecciona un archivo M3U");
-      return;
-    }
+    if (!m3uFile) return setErrorMsg("Selecciona un archivo M3U");
     setIsSubmitting(true);
     const fd = new FormData();
     fd.append("file", m3uFile);
@@ -59,11 +66,8 @@ export default function AdminPanel() {
         headers: authHeader,
         body: fd,
       });
-      const text = await res.text();
-      if (!res.ok || text.trim().startsWith("<!DOCTYPE")) {
-        throw new Error("Token inválido o error al subir M3U");
-      }
-      const data = JSON.parse(text);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setSuccessMsg(data.message);
       setErrorMsg("");
       setM3uFile(null);
@@ -81,17 +85,15 @@ export default function AdminPanel() {
       const res = await fetch(`${API}/api/channels`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ name: channelName, url: channelUrl }),
+        body: JSON.stringify({ name: channelName, url: channelUrl, logo: channelLogo }),
       });
-      const text = await res.text();
-      if (!res.ok || text.trim().startsWith("<!DOCTYPE")) {
-        const err = JSON.parse(text);
-        throw new Error(err.error || "Error al agregar canal");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setSuccessMsg("Canal agregado");
       setErrorMsg("");
       setChannelName("");
       setChannelUrl("");
+      setChannelLogo("");
       fetchChannels();
     } catch (err) {
       setErrorMsg(err.message);
@@ -107,17 +109,16 @@ export default function AdminPanel() {
       const res = await fetch(`${API}/api/videos/upload-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ title: videoTitle, url: videoUrl }),
+        body: JSON.stringify({ title: videoTitle, url: videoUrl, thumbnail: videoThumb }),
       });
-      const text = await res.text();
-      if (!res.ok || text.trim().startsWith("<!DOCTYPE")) {
-        const err = JSON.parse(text);
-        throw new Error(err.error || "Error al agregar video");
-      }
-      setSuccessMsg("Video VOD agregado");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccessMsg("Video agregado");
       setErrorMsg("");
       setVideoTitle("");
       setVideoUrl("");
+      setVideoThumb("");
+      fetchVideos();
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -132,7 +133,6 @@ export default function AdminPanel() {
   return (
     <div className="p-6 space-y-8 max-w-4xl mx-auto bg-gray-900 text-white">
       <h1 className="text-3xl font-bold">Panel de Administración</h1>
-
       {errorMsg && <div className="p-3 bg-red-800 rounded">{errorMsg}</div>}
       {successMsg && <div className="p-3 bg-green-800 rounded">{successMsg}</div>}
 
@@ -161,18 +161,9 @@ export default function AdminPanel() {
         <>
           <form onSubmit={submitChannel} className="p-6 bg-gray-800 rounded-lg space-y-4">
             <h2 className="text-xl">Agregar Canal</h2>
-            <Input
-              placeholder="Nombre"
-              value={channelName}
-              onChange={(e) => setChannelName(e.target.value)}
-              className="bg-gray-700"
-            />
-            <Input
-              placeholder="URL M3U8"
-              value={channelUrl}
-              onChange={(e) => setChannelUrl(e.target.value)}
-              className="bg-gray-700"
-            />
+            <Input placeholder="Nombre" value={channelName} onChange={(e) => setChannelName(e.target.value)} className="bg-gray-700" />
+            <Input placeholder="URL M3U8" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} className="bg-gray-700" />
+            <Input placeholder="Logo URL (opcional)" value={channelLogo} onChange={(e) => setChannelLogo(e.target.value)} className="bg-gray-700" />
             <Button disabled={isSubmitting} className="bg-blue-600">
               {isSubmitting ? "Agregando..." : "Agregar Canal"}
             </Button>
@@ -182,8 +173,11 @@ export default function AdminPanel() {
             <h2 className="text-xl mb-4">Canales Existentes</h2>
             {channels.map((ch) => (
               <div key={ch._id} className="flex justify-between mb-2">
-                <span>{ch.name}</span>
-                <Button onClick={() => {/* TODO: eliminar */}} className="bg-red-600">
+                <div>
+                  <strong>{ch.name}</strong>
+                  <div className="text-xs text-gray-400">{ch.url}</div>
+                </div>
+                <Button onClick={() => alert("Función de edición o eliminación pendiente")} className="bg-red-600">
                   Eliminar
                 </Button>
               </div>
@@ -195,18 +189,9 @@ export default function AdminPanel() {
       {activeTab === "vod" && (
         <form onSubmit={submitVideo} className="p-6 bg-gray-800 rounded-lg space-y-4">
           <h2 className="text-xl">Agregar Video VOD</h2>
-          <Input
-            placeholder="Título"
-            value={videoTitle}
-            onChange={(e) => setVideoTitle(e.target.value)}
-            className="bg-gray-700"
-          />
-          <Input
-            placeholder="URL MP4/MKV"
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            className="bg-gray-700"
-          />
+          <Input placeholder="Título" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} className="bg-gray-700" />
+          <Input placeholder="URL MP4/MKV" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="bg-gray-700" />
+          <Input placeholder="Thumbnail URL (opcional)" value={videoThumb} onChange={(e) => setVideoThumb(e.target.value)} className="bg-gray-700" />
           <Button disabled={isSubmitting} className="bg-blue-600">
             {isSubmitting ? "Procesando..." : "Agregar VOD"}
           </Button>
