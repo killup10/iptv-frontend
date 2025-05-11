@@ -1,31 +1,38 @@
 // src/pages/Home.jsx
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Carousel from '../components/Carousel.jsx';
-import { fetchChannels, fetchMovies, fetchSeries } from '../utils/api.js';
+// IMPORTANTE: Asegúrate que tu api.js exporte estas funciones para contenido PÚBLICO
+import { 
+  fetchFeaturedChannels, 
+  fetchFeaturedPublicContent // Esta debería devolver { movies: [...], series: [...] }
+} from '../utils/api.js';
 
 export function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [channels, setChannels] = useState([]);
-  const [movies, setMovies] = useState([]);
-  const [series, setSeries] = useState([]);
+  const [featuredChannels, setFeaturedChannels] = useState([]);
+  const [featuredMovies, setFeaturedMovies] = useState([]);
+  const [featuredSeries, setFeaturedSeries] = useState([]);
 
   useEffect(() => {
     async function loadData() {
+      setLoading(true);
       try {
-        const [ch, mv, sr] = await Promise.all([
-          fetchChannels(),
-          fetchMovies(),
-          fetchSeries(),
-        ]);
-        setChannels(ch);
-        setMovies(mv);
-        setSeries(sr);
+        const channelsData = await fetchFeaturedChannels();
+        setFeaturedChannels(channelsData ? channelsData.slice(0, 10) : []); // Mostrar solo algunos
+
+        const publicContent = await fetchFeaturedPublicContent(); // Espera { movies: [...], series: [...] }
+        setFeaturedMovies(publicContent.movies ? publicContent.movies.slice(0, 10) : []);
+        setFeaturedSeries(publicContent.series ? publicContent.series.slice(0, 10) : []);
+
       } catch (err) {
-        console.error('Error cargando datos:', err);
+        console.error('Error cargando datos destacados para Home:', err);
+        setFeaturedChannels([]);
+        setFeaturedMovies([]);
+        setFeaturedSeries([]);
       } finally {
         setLoading(false);
       }
@@ -33,40 +40,69 @@ export function Home() {
     loadData();
   }, []);
 
+  const handleItemClick = (item, itemType) => {
+    const targetPath = `/watch/${itemType}/${item.id || item._id}`; 
+    if (user && user.token) {
+      navigate(targetPath);
+    } else {
+      navigate('/login', { state: { from: targetPath } });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  const onChannelClick = (channel) => navigate(`/watch/${channel.id}`);
-  const onMovieClick = (movie) => navigate(`/watch/${movie.id}`);
-  const onSeriesClick = (serie) => navigate(`/watch/${serie.id}`);
-
   return (
-    <div className="min-h-screen relative">
-      {/* Fondo blur */}
-      <div
-        className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
-        style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
-      />
-
-      <div className="relative z-10 max-w-screen-xl mx-auto pt-24 pb-16 text-center text-white px-4">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
-          Bienvenido a <span className="text-red-600">TeamG Play</span>
-        </h1>
-        <p className="text-lg max-w-2xl mx-auto text-gray-300">
-          Descubre los últimos estrenos, canales en vivo, películas y series disponibles en nuestra plataforma.
-        </p>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Sección Hero */}
+      <div className="relative h-[70vh] md:h-[80vh] flex flex-col items-center justify-center text-center px-4">
+        <div
+          className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
+          style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
+        />
+        <div className="relative z-10">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 text-white">
+            Bienvenido a <span className="text-red-600">TeamG Play</span>
+          </h1>
+          <p className="text-lg md:text-xl max-w-2xl mx-auto text-gray-300">
+            Descubre los últimos estrenos, canales en vivo, películas y series disponibles en nuestra plataforma.
+          </p>
+        </div>
       </div>
 
-      {/* Carouseles siempre visibles */}
-      <div className="relative z-10 max-w-screen-xl mx-auto px-4">
-        <Carousel title="Canales en Vivo" items={channels} onItemClick={onChannelClick} />
-        <Carousel title="Películas Destacadas" items={movies} onItemClick={onMovieClick} />
-        <Carousel title="Series Populares" items={series} onItemClick={onSeriesClick} />
+      {/* Sección de Carouseles */}
+      <div className="py-8 md:py-12 lg:py-16">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+          {featuredChannels.length > 0 && (
+            <Carousel 
+              title="Canales en Vivo Destacados" 
+              items={featuredChannels} 
+              onItemClick={(item) => handleItemClick(item, 'channel')} 
+            />
+          )}
+          {featuredMovies.length > 0 && (
+            <Carousel 
+              title="Películas Destacadas" 
+              items={featuredMovies} 
+              onItemClick={(item) => handleItemClick(item, 'movie')} 
+            />
+          )}
+          {featuredSeries.length > 0 && (
+            <Carousel 
+              title="Series Populares" 
+              items={featuredSeries} 
+              onItemClick={(item) => handleItemClick(item, 'serie')} 
+            />
+          )}
+          {(featuredChannels.length === 0 && featuredMovies.length === 0 && featuredSeries.length === 0 && !loading) && (
+            <p className="text-center text-gray-500 py-10">No hay contenido destacado disponible en este momento.</p>
+          )}
+        </div>
       </div>
     </div>
   );
