@@ -3,11 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Carousel from '../components/Carousel.jsx';
-// IMPORTAMOS LAS FUNCIONES CORRECTAS (asumiendo que api.js exporta estas tres)
+// IMPORTAMOS LAS FUNCIONES CORRECTAS
 import { 
   fetchFeaturedChannels, 
-  fetchFeaturedMovies,
-  fetchFeaturedSeries 
+  fetchFeaturedPublicContent // Esta devuelve { movies: [...], series: [...] }
 } from '../utils/api.js';
 
 export function Home() {
@@ -17,24 +16,26 @@ export function Home() {
   const [featuredChannels, setFeaturedChannels] = useState([]);
   const [featuredMovies, setFeaturedMovies] = useState([]);
   const [featuredSeries, setFeaturedSeries] = useState([]);
+  const [error, setError] = useState(null); // Estado para errores de carga
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      setError(null); // Limpiar errores anteriores
       try {
-        // Usamos las funciones importadas correctamente
+        console.log("Home.jsx: Iniciando carga de datos destacados...");
         const channelsData = await fetchFeaturedChannels();
-        // Aseguramos que sea un array y tomamos una porción (ej. los primeros 10)
         setFeaturedChannels(Array.isArray(channelsData) ? channelsData.slice(0, 10) : []);
+        console.log("Home.jsx: Canales destacados cargados:", channelsData);
 
-        const moviesData = await fetchFeaturedMovies();
-        setFeaturedMovies(Array.isArray(moviesData) ? moviesData.slice(0, 10) : []);
-        
-        const seriesData = await fetchFeaturedSeries();
-        setFeaturedSeries(Array.isArray(seriesData) ? seriesData.slice(0, 10) : []);
+        const publicContent = await fetchFeaturedPublicContent(); 
+        setFeaturedMovies(publicContent && Array.isArray(publicContent.movies) ? publicContent.movies.slice(0, 10) : []);
+        setFeaturedSeries(publicContent && Array.isArray(publicContent.series) ? publicContent.series.slice(0, 10) : []);
+        console.log("Home.jsx: Contenido VOD destacado cargado:", publicContent);
 
       } catch (err) {
-        console.error('Error cargando datos destacados para Home:', err.message); // Mostrar err.message para más detalle
+        console.error('Home.jsx: Error cargando datos destacados:', err.message);
+        setError(err.message || "Error al cargar contenido destacado."); // Guardar error para mostrarlo
         setFeaturedChannels([]);
         setFeaturedMovies([]);
         setFeaturedSeries([]);
@@ -43,12 +44,11 @@ export function Home() {
       }
     }
     loadData();
-  }, []); // Se ejecuta una vez al montar
+  }, []);
 
   const handleItemClick = (item, itemType) => {
-    // Asegurarse que item y item.id o item._id existan
     if (!item || (!item.id && !item._id)) {
-      console.error("Error: Item o ID del item no definido.", item);
+      console.error("Home.jsx: Error - Item o ID del item no definido.", item);
       return;
     }
     const itemId = item.id || item._id;
@@ -90,33 +90,34 @@ export function Home() {
       {/* Sección de Carouseles */}
       <div className="py-8 md:py-12 lg:py-16">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
-          {featuredChannels.length > 0 && (
+          {error && <p className="text-center text-red-500 py-10">Error al cargar contenido: {error}</p>}
+          
+          {!error && featuredChannels.length > 0 && (
             <Carousel 
               title="Canales en Vivo Destacados" 
               items={featuredChannels} 
               onItemClick={(item) => handleItemClick(item, 'channel')} 
             />
           )}
-          {featuredMovies.length > 0 && (
+          {!error && featuredMovies.length > 0 && (
             <Carousel 
               title="Películas Destacadas" 
               items={featuredMovies} 
               onItemClick={(item) => handleItemClick(item, 'movie')} 
             />
           )}
-          {featuredSeries.length > 0 && (
+          {!error && featuredSeries.length > 0 && (
             <Carousel 
               title="Series Populares" 
               items={featuredSeries} 
               onItemClick={(item) => handleItemClick(item, 'serie')} 
             />
           )}
-          {(featuredChannels.length === 0 && featuredMovies.length === 0 && featuredSeries.length === 0 && !loading) && (
+          {!error && featuredChannels.length === 0 && featuredMovies.length === 0 && featuredSeries.length === 0 && !loading && (
             <p className="text-center text-gray-500 py-10">No hay contenido destacado disponible en este momento.</p>
           )}
         </div>
       </div>
-      {/* Aquí puedes añadir tu componente Footer si lo tienes */}
     </div>
   );
 }
