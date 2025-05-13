@@ -90,7 +90,6 @@ export async function fetchUserSeries() {
     }));
 }
 
-
 // --- Funciones para contenido destacado PÚBLICO (NO requieren token) ---
 
 export async function fetchFeaturedChannels() {
@@ -107,21 +106,21 @@ export async function fetchFeaturedChannels() {
     name: c.name, 
     thumbnail: c.thumbnail || c.logo || "", 
     url: c.url, 
-    category: c.category || "general" 
+    category: c.category || "general",
+    description: c.description || "", // Asegurar que los datos del canal también incluyan esto si Card lo usa
+    trailerUrl: "" // Los canales usualmente no tienen tráiler
   }));
 }
 
-// Funciones separadas para películas y series destacadas
-// Asegúrate de que tu backend TENGA estos endpoints públicos separados.
 export async function fetchFeaturedMovies() {
   console.log("API: Fetching featured movies from:", `${API_BASE_URL}/api/videos/public/featured-movies`);
-  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-movies`); // Endpoint específico para películas destacadas
+  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-movies`);
   if (!response.ok) {
     const errorText = await response.text().catch(() => `Error ${response.status} al cargar películas destacadas.`);
     console.error(`Error al cargar películas destacadas: ${response.status}`, errorText);
     throw new Error(`Error al cargar películas destacadas: ${errorText}`);
   }
-  const data = await response.json(); // Asume que devuelve un array de películas
+  const data = await response.json(); // Asume que el backend devuelve un array de películas
   return data.map(v => ({ 
     id: v._id, 
     name: v.title, 
@@ -136,13 +135,13 @@ export async function fetchFeaturedMovies() {
 
 export async function fetchFeaturedSeries() {
   console.log("API: Fetching featured series from:", `${API_BASE_URL}/api/videos/public/featured-series`);
-  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-series`); // Endpoint específico para series destacadas
+  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-series`);
   if (!response.ok) {
     const errorText = await response.text().catch(() => `Error ${response.status} al cargar series destacadas.`);
     console.error(`Error al cargar series destacadas: ${response.status}`, errorText);
     throw new Error(`Error al cargar series destacadas: ${errorText}`);
   }
-  const data = await response.json(); // Asume que devuelve un array de series
+  const data = await response.json(); // Asume que el backend devuelve un array de series
   return data.map(v => ({ 
     id: v._id, 
     name: v.title,
