@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Carousel from '../components/Carousel.jsx';
-// IMPORTAMOS LAS FUNCIONES CORRECTAS QUE SÍ ESTÁN EXPORTADAS EN TU ÚLTIMO api.js
+// IMPORTAMOS LAS FUNCIONES CORRECTAS (asumiendo que api.js exporta estas tres)
 import { 
   fetchFeaturedChannels, 
   fetchFeaturedMovies,
@@ -24,16 +24,17 @@ export function Home() {
       try {
         // Usamos las funciones importadas correctamente
         const channelsData = await fetchFeaturedChannels();
-        setFeaturedChannels(channelsData ? channelsData.slice(0, 10) : []);
+        // Aseguramos que sea un array y tomamos una porción (ej. los primeros 10)
+        setFeaturedChannels(Array.isArray(channelsData) ? channelsData.slice(0, 10) : []);
 
         const moviesData = await fetchFeaturedMovies();
-        setFeaturedMovies(moviesData ? moviesData.slice(0, 10) : []);
+        setFeaturedMovies(Array.isArray(moviesData) ? moviesData.slice(0, 10) : []);
         
         const seriesData = await fetchFeaturedSeries();
-        setFeaturedSeries(seriesData ? seriesData.slice(0, 10) : []);
+        setFeaturedSeries(Array.isArray(seriesData) ? seriesData.slice(0, 10) : []);
 
       } catch (err) {
-        console.error('Error cargando datos destacados para Home:', err);
+        console.error('Error cargando datos destacados para Home:', err.message); // Mostrar err.message para más detalle
         setFeaturedChannels([]);
         setFeaturedMovies([]);
         setFeaturedSeries([]);
@@ -42,10 +43,17 @@ export function Home() {
       }
     }
     loadData();
-  }, []);
+  }, []); // Se ejecuta una vez al montar
 
   const handleItemClick = (item, itemType) => {
-    const targetPath = `/watch/${itemType}/${item.id || item._id}`; 
+    // Asegurarse que item y item.id o item._id existan
+    if (!item || (!item.id && !item._id)) {
+      console.error("Error: Item o ID del item no definido.", item);
+      return;
+    }
+    const itemId = item.id || item._id;
+    const targetPath = `/watch/${itemType}/${itemId}`; 
+    
     if (user && user.token) {
       navigate(targetPath);
     } else {
@@ -67,7 +75,7 @@ export function Home() {
       <div className="relative h-[70vh] md:h-[80vh] flex flex-col items-center justify-center text-center px-4">
         <div
           className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
-          style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }} // Asegúrate que esta imagen esté en /public
+          style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
         />
         <div className="relative z-10">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 text-white">
@@ -108,6 +116,7 @@ export function Home() {
           )}
         </div>
       </div>
+      {/* Aquí puedes añadir tu componente Footer si lo tienes */}
     </div>
   );
 }
