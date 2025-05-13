@@ -6,47 +6,56 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 function getAuthHeaders() {
   const token = localStorage.getItem("token"); // Obtener el token MÁS ACTUAL
   if (token) {
-    return { 
+    return {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json' // Es bueno incluirlo si esperas/envías JSON
+      'Content-Type': 'application/json'
     };
   }
-  return { 'Content-Type': 'application/json' }; // Headers mínimos si no hay token
+  return { 'Content-Type': 'application/json' };
 }
 
-export async function fetchUserChannels() { // Renombrada para claridad
+export async function fetchUserChannels() {
   const headers = getAuthHeaders();
-  if (!headers.Authorization) { // Si no hay token, no intentar cargar canales protegidos
+  if (!headers.Authorization) {
     console.warn("fetchUserChannels: No hay token, no se pueden cargar canales del usuario.");
-    return []; // O lanzar un error, o manejar según la lógica de tu app
+    return [];
   }
+  // Llamamos a /api/channels/list, que es público pero podría filtrar por plan si detecta token en el futuro
   const response = await fetch(`${API_BASE_URL}/api/channels/list`, { headers });
   if (!response.ok) {
-    // Podrías querer leer response.text() para obtener el mensaje de error del backend
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar canales del usuario: ${response.status} ${errorText}`);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar canales del usuario: ${errorText}`);
   }
-  return response.json(); 
+  // El backend ya devuelve el formato correcto {id, name, thumbnail, url, category}
+  return response.json();
 }
 
-export async function fetchUserMovies() { // Renombrada para claridad
+export async function fetchUserMovies() {
   const headers = getAuthHeaders();
   if (!headers.Authorization) {
     console.warn("fetchUserMovies: No hay token, no se pueden cargar películas del usuario.");
     return [];
   }
   const response = await fetch(`${API_BASE_URL}/api/videos`, { headers });
-   if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar películas del usuario: ${response.status} ${errorText}`);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar películas del usuario: ${errorText}`);
   }
   const data = await response.json();
   return data
     .filter(v => v.tipo === "pelicula")
-    .map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url, category: v.category })); // Añadí category por si es útil
+    // Mapear a formato frontend consistente
+    .map(v => ({ 
+        id: v._id, 
+        name: v.title, 
+        title: v.title, 
+        thumbnail: v.logo || v.thumbnail || "", 
+        url: v.url, 
+        category: v.category || "general" 
+    }));
 }
 
-export async function fetchUserSeries() { // Renombrada para claridad
+export async function fetchUserSeries() {
   const headers = getAuthHeaders();
   if (!headers.Authorization) {
     console.warn("fetchUserSeries: No hay token, no se pueden cargar series del usuario.");
@@ -54,48 +63,48 @@ export async function fetchUserSeries() { // Renombrada para claridad
   }
   const response = await fetch(`${API_BASE_URL}/api/videos`, { headers });
   if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar series del usuario: ${response.status} ${errorText}`);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar series del usuario: ${errorText}`);
   }
   const data = await response.json();
   return data
     .filter(v => v.tipo === "serie")
-    .map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url, category: v.category }));
+    // Mapear a formato frontend consistente
+    .map(v => ({ 
+        id: v._id, 
+        name: v.title, 
+        title: v.title, 
+        thumbnail: v.logo || v.thumbnail || "", 
+        url: v.url, 
+        category: v.category || "general" 
+    }));
 }
 
-
-// --- NUEVAS Funciones para contenido destacado PÚBLICO (NO requieren token) ---
+// --- Funciones para contenido destacado PÚBLICO (NO requieren token) ---
 
 export async function fetchFeaturedChannels() {
-  // Este endpoint NO debe requerir autenticación en tu backend
-  const response = await fetch(`${API_BASE_URL}/api/public/featured-channels`);
+  // *** CORRECCIÓN AQUÍ: Llamar al endpoint público existente /api/channels/list ***
+  const response = await fetch(`${API_BASE_URL}/api/channels/list`); 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar canales destacados: ${response.status} ${errorText}`);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar canales destacados: ${errorText}`);
   }
-  return response.json();
+  // El backend /api/channels/list ya devuelve el formato correcto {id, name, thumbnail, url, category}
+  return response.json(); 
 }
 
-export async function fetchFeaturedMovies() {
-  // Este endpoint NO debe requerir autenticación y debería devolver solo películas destacadas
-  // Podrías tener un solo endpoint /api/public/featured-videos?tipo=pelicula
-  const response = await fetch(`${API_BASE_URL}/api/public/featured-movies`);
+// *** CORRECCIÓN AQUÍ: Usar una sola función para VOD destacado ***
+// Esta función asume que tu backend tiene UN solo endpoint /api/videos/public/featured
+// que devuelve un objeto: { movies: [...], series: [...] }
+export async function fetchFeaturedPublicContent() { 
+  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured`); // Llama al endpoint que SÍ creamos
   if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar películas destacadas: ${response.status} ${errorText}`);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar contenido VOD destacado: ${errorText}`);
   }
-  const data = await response.json();
-  // Asumiendo que el backend ya filtra por tipo 'pelicula' para este endpoint
-  return data.map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url, category: v.category }));
+  return response.json(); // Espera { movies: [...], series: [...] }
 }
 
-export async function fetchFeaturedSeries() {
-  // Similar a fetchFeaturedMovies, para series
-  const response = await fetch(`${API_BASE_URL}/api/public/featured-series`);
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Error desconocido');
-    throw new Error(`Error al cargar series destacadas: ${response.status} ${errorText}`);
-  }
-  const data = await response.json();
-  return data.map(v => ({ id: v._id, name: v.title, thumbnail: v.thumbnail, url: v.url, category: v.category }));
-}
+// YA NO NECESITAMOS LAS FUNCIONES SEPARADAS fetchFeaturedMovies y fetchFeaturedSeries si usamos la de arriba
+// export async function fetchFeaturedMovies() { ... }
+// export async function fetchFeaturedSeries() { ... }
