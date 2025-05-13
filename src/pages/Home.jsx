@@ -6,7 +6,8 @@ import Carousel from '../components/Carousel.jsx';
 // IMPORTAMOS LAS FUNCIONES CORRECTAS
 import { 
   fetchFeaturedChannels, 
-  fetchFeaturedPublicContent // Esta devuelve { movies: [...], series: [...] }
+  fetchFeaturedMovies,
+  fetchFeaturedSeries 
 } from '../utils/api.js';
 
 export function Home() {
@@ -16,26 +17,30 @@ export function Home() {
   const [featuredChannels, setFeaturedChannels] = useState([]);
   const [featuredMovies, setFeaturedMovies] = useState([]);
   const [featuredSeries, setFeaturedSeries] = useState([]);
-  const [error, setError] = useState(null); // Estado para errores de carga
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      setError(null); // Limpiar errores anteriores
+      setError(null);
       try {
         console.log("Home.jsx: Iniciando carga de datos destacados...");
+        
         const channelsData = await fetchFeaturedChannels();
         setFeaturedChannels(Array.isArray(channelsData) ? channelsData.slice(0, 10) : []);
         console.log("Home.jsx: Canales destacados cargados:", channelsData);
 
-        const publicContent = await fetchFeaturedPublicContent(); 
-        setFeaturedMovies(publicContent && Array.isArray(publicContent.movies) ? publicContent.movies.slice(0, 10) : []);
-        setFeaturedSeries(publicContent && Array.isArray(publicContent.series) ? publicContent.series.slice(0, 10) : []);
-        console.log("Home.jsx: Contenido VOD destacado cargado:", publicContent);
+        const moviesData = await fetchFeaturedMovies();
+        setFeaturedMovies(Array.isArray(moviesData) ? moviesData.slice(0, 10) : []);
+        console.log("Home.jsx: Películas destacadas cargadas:", moviesData);
+        
+        const seriesData = await fetchFeaturedSeries();
+        setFeaturedSeries(Array.isArray(seriesData) ? seriesData.slice(0, 10) : []);
+        console.log("Home.jsx: Series destacadas cargadas:", seriesData);
 
       } catch (err) {
         console.error('Home.jsx: Error cargando datos destacados:', err.message);
-        setError(err.message || "Error al cargar contenido destacado."); // Guardar error para mostrarlo
+        setError(err.message || "Error al cargar contenido destacado.");
         setFeaturedChannels([]);
         setFeaturedMovies([]);
         setFeaturedSeries([]);
@@ -52,7 +57,7 @@ export function Home() {
       return;
     }
     const itemId = item.id || item._id;
-    const targetPath = `/watch/${itemType}/${itemId}`; 
+    const targetPath = `/watch/<span class="math-inline">\{itemType\}/</span>{itemId}`; 
     
     if (user && user.token) {
       navigate(targetPath);
@@ -96,24 +101,27 @@ export function Home() {
             <Carousel 
               title="Canales en Vivo Destacados" 
               items={featuredChannels} 
-              onItemClick={(item) => handleItemClick(item, 'channel')} 
+              onItemClick={(item) => handleItemClick(item, 'channel')}
+              itemType="channel" 
             />
           )}
           {!error && featuredMovies.length > 0 && (
             <Carousel 
               title="Películas Destacadas" 
               items={featuredMovies} 
-              onItemClick={(item) => handleItemClick(item, 'movie')} 
+              onItemClick={(item) => handleItemClick(item, 'movie')}
+              itemType="movie" 
             />
           )}
           {!error && featuredSeries.length > 0 && (
             <Carousel 
               title="Series Populares" 
               items={featuredSeries} 
-              onItemClick={(item) => handleItemClick(item, 'serie')} 
+              onItemClick={(item) => handleItemClick(item, 'serie')}
+              itemType="serie" 
             />
           )}
-          {!error && featuredChannels.length === 0 && featuredMovies.length === 0 && featuredSeries.length === 0 && !loading && (
+          {(!error && featuredChannels.length === 0 && featuredMovies.length === 0 && featuredSeries.length === 0 && !loading) && (
             <p className="text-center text-gray-500 py-10">No hay contenido destacado disponible en este momento.</p>
           )}
         </div>
@@ -121,5 +129,4 @@ export function Home() {
     </div>
   );
 }
-
 export default Home;
