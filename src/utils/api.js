@@ -206,3 +206,44 @@ export async function fetchFeaturedSeries() {
     };
   });
 }
+
+// src/utils/api.js
+
+// ... (tus otras funciones existentes: getAuthHeaders, fetchUserChannels, fetchUserMovies, 
+// fetchUserSeries, fetchFeaturedChannels, fetchFeaturedMovies, fetchFeaturedSeries) ...
+
+
+// --- NUEVA FUNCIÓN para obtener las secciones principales de películas ---
+export async function fetchMainMovieSections() {
+  // Asumimos que getAuthHeaders() está definido en este archivo y obtiene el token si existe
+  const headers = getAuthHeaders(); 
+  // Si esta ruta debe ser pública, puedes omitir el token o manejarlo opcionalmente en el backend.
+  // Por ahora, asumimos que necesita el token para saber qué secciones mostrar basadas en el plan del usuario.
+
+  console.log("API: Fetching main movie sections from:", `${API_BASE_URL}/api/videos/main-sections`);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/videos/main-sections`, { headers });
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Error ${response.status} al cargar secciones principales de películas.`);
+      console.error(`Error al cargar secciones principales de películas: ${response.status}`, errorText);
+      // Lanza un error para que sea capturado por el `catch` en MoviesPage.jsx
+      throw new Error(`Error ${response.status}: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log("API: Secciones principales de películas recibidas:", data);
+    return data; // Devuelve los datos directamente (un array de objetos de sección)
+
+  } catch (error) {
+    console.error("API: Fallo en fetchMainMovieSections -", error.message);
+    // En caso de error, puedes devolver un array vacío o un conjunto de secciones por defecto
+    // para evitar que la UI se rompa completamente. O relanzar el error para que MoviesPage.jsx lo maneje.
+    // throw error; // Opción: relanzar para que MoviesPage.jsx muestre el error
+    return [ // Opción: devolver un default para que la UI no se rompa totalmente
+        { key: "POR_GENERO", displayName: "POR GÉNEROS (Error al cargar)", thumbnailSample: "/img/placeholders/por_generos.jpg", requiresPlan: "basico", order: 99 },
+        // Podrías añadir más secciones por defecto o simplemente un array vacío []
+    ]; 
+  }
+}
+// --- FIN NUEVA FUNCIÓN ---
