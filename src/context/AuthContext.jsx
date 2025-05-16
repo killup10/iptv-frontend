@@ -1,14 +1,13 @@
-// src/context/AuthContext.jsx
+// iptv-frontend/src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // <--- NUEVO ESTADO: true al inicio
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // Este efecto se ejecuta solo una vez al montar el AuthProvider
     console.log("AuthContext: Verificando sesión almacenada...");
     try {
       const storedUserString = localStorage.getItem("user");
@@ -16,33 +15,44 @@ export function AuthProvider({ children }) {
 
       if (storedUserString && token) {
         const storedUser = JSON.parse(storedUserString);
-        setUser({ ...storedUser, token });
-        console.log("AuthContext: Sesión restaurada desde localStorage.", { ...storedUser, token });
+        // Asegúrate que el 'role' también se cargue desde localStorage
+        setUser({ 
+            username: storedUser.username, 
+            role: storedUser.role, // <--- IMPORTANTE AL CARGAR
+            token 
+        });
+        console.log("AuthContext: Sesión restaurada desde localStorage.", { username: storedUser.username, role: storedUser.role, token });
       } else {
         console.log("AuthContext: No se encontró sesión almacenada.");
       }
     } catch (error) {
       console.error("AuthContext: Error al parsear datos de localStorage", error);
-      // Limpiar localStorage si los datos están corruptos
       localStorage.removeItem("user");
       localStorage.removeItem("token");
       setUser(null);
     } finally {
-      setIsLoadingAuth(false); // <--- IMPORTANTE: Marcar como finalizada la carga/verificación inicial
-      console.log("AuthContext: Verificación inicial de auth completada.");
+      setIsLoadingAuth(false);
+      console.log("AuthContext: Verificación inicial de auth completada. isLoadingAuth:", false);
     }
-  }, []); // El array vacío [] asegura que se ejecute solo una vez al montar
+  }, []);
 
-  const login = (userData) => { // userData debe ser { username, role, token }
-    if (!userData || !userData.token || !userData.username) {
-      console.error("AuthContext: Intento de login con datos incompletos.", userData);
+  const login = (userDataFromBackend) => { // userDataFromBackend es { token, user: { username, role } }
+    if (!userDataFromBackend || !userDataFromBackend.token || !userDataFromBackend.user || !userDataFromBackend.user.username || typeof userDataFromBackend.user.role === 'undefined') {
+      console.error("AuthContext: Intento de login con datos incompletos desde el backend.", userDataFromBackend);
+      // Podrías lanzar un error o establecer un estado de error aquí
       return;
     }
-    const userToStore = { username: userData.username, role: userData.role };
-    localStorage.setItem("user", JSON.stringify(userToStore));
-    localStorage.setItem("token", userData.token);
-    setUser({ ...userToStore, token: userData.token }); // Guardar el objeto completo en el estado
-    console.log("AuthContext: Usuario logueado:", { ...userToStore, token: userData.token });
+    
+    const userToStoreInStateAndLocalStorage = { 
+        username: userDataFromBackend.user.username, 
+        role: userDataFromBackend.user.role // <--- Asegúrate que el rol viene del backend
+    };
+
+    localStorage.setItem("user", JSON.stringify(userToStoreInStateAndLocalStorage)); // Solo username y role
+    localStorage.setItem("token", userDataFromBackend.token);
+    
+    setUser({ ...userToStoreInStateAndLocalStorage, token: userDataFromBackend.token });
+    console.log("AuthContext: Usuario logueado y estado establecido:", { ...userToStoreInStateAndLocalStorage, token: userDataFromBackend.token });
   };
 
   const logout = () => {
@@ -50,24 +60,18 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
     setUser(null);
     console.log("AuthContext: Usuario deslogueado.");
-    // Opcional: podrías querer redirigir a /login aquí usando useNavigate,
-    // pero es mejor manejar la redirección en el componente que llama a logout.
   };
 
-  // El valor que se provee al contexto
   const contextValue = {
     user,
     login,
     logout,
-    isLoadingAuth, // <--- Exponer el nuevo estado
-    token: user?.token // <--- Exponer el token directamente por conveniencia
+    isLoadingAuth,
+    token: user?.token
   };
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {/* Renderiza children solo después de la carga inicial si prefieres,
-          aunque ProtectedRoute ya maneja esto. */}
-      {/* {isLoadingAuth ? <SpinnerGlobal/> : children} */}
       {children}
     </AuthContext.Provider>
   );
