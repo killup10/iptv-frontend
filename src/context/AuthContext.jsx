@@ -15,15 +15,22 @@ export function AuthProvider({ children }) {
 
       if (storedUserString && token) {
         const storedUser = JSON.parse(storedUserString);
-        // Asegúrate que el 'role' también se cargue desde localStorage
-        setUser({ 
-            username: storedUser.username, 
-            role: storedUser.role, // <--- IMPORTANTE AL CARGAR
-            token 
+        // Asegúrate que todos los campos necesarios del usuario se carguen desde localStorage
+        setUser({
+          username: storedUser.username,
+          role: storedUser.role,
+          plan: storedUser.plan, // <--- CORRECCIÓN: Cargar plan desde localStorage
+          token
         });
-        console.log("AuthContext: Sesión restaurada desde localStorage.", { username: storedUser.username, role: storedUser.role, token });
+        console.log("AuthContext: Sesión restaurada desde localStorage.", {
+          username: storedUser.username,
+          role: storedUser.role,
+          plan: storedUser.plan, // <--- CORRECCIÓN: Incluir plan en el log
+          tokenLoaded: !!token
+        });
       } else {
         console.log("AuthContext: No se encontró sesión almacenada.");
+        setUser(null); // Asegurar que user sea null si no hay sesión
       }
     } catch (error) {
       console.error("AuthContext: Error al parsear datos de localStorage", error);
@@ -36,23 +43,38 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = (userDataFromBackend) => { // userDataFromBackend es { token, user: { username, role } }
-    if (!userDataFromBackend || !userDataFromBackend.token || !userDataFromBackend.user || !userDataFromBackend.user.username || typeof userDataFromBackend.user.role === 'undefined') {
-      console.error("AuthContext: Intento de login con datos incompletos desde el backend.", userDataFromBackend);
-      // Podrías lanzar un error o establecer un estado de error aquí
-      return;
+  // userDataFromBackend ahora se espera que sea { token: "...", user: { username: "...", role: "...", plan: "..." } }
+  const login = (userDataFromBackend) => {
+    console.log("AuthContext: login() llamado con:", userDataFromBackend); 
+    if (
+      !userDataFromBackend ||
+      !userDataFromBackend.token ||
+      !userDataFromBackend.user ||
+      !userDataFromBackend.user.username ||
+      typeof userDataFromBackend.user.role === 'undefined' ||
+      typeof userDataFromBackend.user.plan === 'undefined' // <--- CORRECCIÓN: Añadida verificación para PLAN
+    ) {
+      console.error("AuthContext: Intento de login con datos incompletos desde el backend. Se esperaba {token, user:{username,role,plan}}", userDataFromBackend);
+      return; 
     }
-    
-    const userToStoreInStateAndLocalStorage = { 
-        username: userDataFromBackend.user.username, 
-        role: userDataFromBackend.user.role // <--- Asegúrate que el rol viene del backend
+
+    const userToStoreInStateAndLocalStorage = {
+      username: userDataFromBackend.user.username,
+      role: userDataFromBackend.user.role,
+      plan: userDataFromBackend.user.plan // <--- CORRECCIÓN: Almacenar PLAN
     };
 
-    localStorage.setItem("user", JSON.stringify(userToStoreInStateAndLocalStorage)); // Solo username y role
+    localStorage.setItem("user", JSON.stringify(userToStoreInStateAndLocalStorage));
     localStorage.setItem("token", userDataFromBackend.token);
-    
-    setUser({ ...userToStoreInStateAndLocalStorage, token: userDataFromBackend.token });
-    console.log("AuthContext: Usuario logueado y estado establecido:", { ...userToStoreInStateAndLocalStorage, token: userDataFromBackend.token });
+
+    const userForState = { // Objeto que se pasará a setUser
+      username: userToStoreInStateAndLocalStorage.username,
+      role: userToStoreInStateAndLocalStorage.role,
+      plan: userToStoreInStateAndLocalStorage.plan, // <--- CORRECCIÓN: Incluir PLAN
+      token: userDataFromBackend.token
+    };
+    setUser(userForState); // <--- Aquí se establece el estado
+    console.log("AuthContext: Usuario logueado y estado establecido:", userForState); // Este log debería ahora mostrar 'plan'
   };
 
   const logout = () => {
@@ -63,11 +85,11 @@ export function AuthProvider({ children }) {
   };
 
   const contextValue = {
-    user,
+    user, // user ahora contendrá { username, role, plan, token }
     login,
     logout,
     isLoadingAuth,
-    token: user?.token
+    token: user?.token 
   };
 
   return (

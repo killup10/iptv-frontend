@@ -1,18 +1,22 @@
 // src/utils/api.js
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// --- Funciones para contenido que REQUIERE autenticación ---
-
-function getAuthHeaders() {
+// --- Funciones para obtener Headers de Autenticación ---
+function getAuthHeaders(isFormData = false) {
   const token = localStorage.getItem("token"); // Obtener el token MÁS ACTUAL
-  const headers = { 
-    'Content-Type': 'application/json' // Siempre enviar Content-Type para consistencia
-  };
+  const headers = {};
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json'; // Default a JSON
+  }
+  // No poner Content-Type si es FormData, el navegador lo hace con el boundary correcto.
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 }
+
+// --- Funciones para Contenido de USUARIO (Requieren autenticación) ---
 
 export async function fetchUserChannels() {
   const headers = getAuthHeaders();
@@ -20,230 +24,293 @@ export async function fetchUserChannels() {
     console.warn("fetchUserChannels: No hay token, no se pueden cargar canales del usuario.");
     return []; 
   }
-  const response = await fetch(`${API_BASE_URL}/api/channels/list`, { headers }); // Asumiendo que /api/channels/list con token devuelve canales del usuario
+  // Este endpoint debe devolver los canales a los que el usuario tiene acceso según su plan
+  const response = await fetch(`${API_BASE_URL}/api/channels/list`, { headers }); 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar canales de usuario.`);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
     console.error(`Error al cargar canales del usuario: ${response.status}`, errorText);
     throw new Error(`Error al cargar canales del usuario: ${response.status} ${errorText}`);
   }
   const data = await response.json();
-  console.log("API (fetchUserChannels): Datos CRUDOS de canales de usuario recibidos del backend:", data);
-
-  return data.map(c => {
-    console.log("API (fetchUserChannels): Mapeando canal del backend:", c);
-    if (!c || (typeof c.id === 'undefined' && typeof c._id === 'undefined')) {
-        console.warn("API (fetchUserChannels): Canal del backend SIN id o _id o item nulo:", c);
-    }
-    return { 
-      id: c.id || c._id, 
-      name: c.name, 
-      thumbnail: c.thumbnail || c.logo || "", 
-      url: c.url, 
-      category: c.category || "general" 
-    };
-  });
+  return data.map(c => ({ 
+    id: c.id || c._id, 
+    name: c.name, 
+    thumbnail: c.thumbnail || c.logo || "", 
+    url: c.url, 
+    category: c.category || "general",
+    description: c.description || "",
+    requiresPlan: c.requiresPlan || "gplay" // Es bueno tenerlo para el frontend
+  }));
 }
 
 export async function fetchUserMovies() {
   const headers = getAuthHeaders();
-  if (!headers.Authorization) {
-    console.warn("fetchUserMovies: No hay token, no se pueden cargar películas del usuario.");
-    return [];
-  }
-  // El frontend usa /api/videos para fetchUserMovies, el backend debe filtrar por 'active: true' y opcionalmente por usuario.
+  if (!headers.Authorization) return [];
   const response = await fetch(`${API_BASE_URL}/api/videos`, { headers }); 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar películas de usuario.`);
-    console.error(`Error al cargar películas del usuario: ${response.status}`, errorText);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
     throw new Error(`Error al cargar películas del usuario: ${errorText}`);
   }
   const data = await response.json();
-  console.log("API (fetchUserMovies): Datos CRUDOS de videos (todos los tipos) recibidos del backend:", data);
-
   return data
-    .filter(v => v.tipo === "pelicula") // Filtrado en frontend
-    .map(v => {
-        console.log("API (fetchUserMovies): Mapeando película del backend:", v);
-        if (!v || typeof v._id === 'undefined') { // Asumiendo que videos siempre usan _id
-            console.warn("API (fetchUserMovies): Película del backend SIN _id o item nulo:", v);
-        }
-        return { 
-            id: v._id, 
-            name: v.title, 
-            title: v.title, 
-            thumbnail: v.logo || v.thumbnail || "", 
-            url: v.url, 
-            category: v.category || "general",
-            description: v.description || "",
-            trailerUrl: v.trailerUrl || ""  
-        };
-    });
+    .filter(v => v.tipo === "pelicula")
+    .map(v => ({ 
+        id: v._id, name: v.title, title: v.title, 
+        thumbnail: v.logo || v.thumbnail || "", url: v.url, 
+        category: v.category || "general", description: v.description || "",
+        trailerUrl: v.trailerUrl || "",
+        genres: v.genres || [],
+        mainSection: v.mainSection 
+    }));
 }
 
 export async function fetchUserSeries() {
   const headers = getAuthHeaders();
-  if (!headers.Authorization) {
-    console.warn("fetchUserSeries: No hay token, no se pueden cargar series del usuario.");
-    return [];
-  }
+  if (!headers.Authorization) return [];
   const response = await fetch(`${API_BASE_URL}/api/videos`, { headers }); 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar series de usuario.`);
-    console.error(`Error al cargar series del usuario: ${response.status}`, errorText);
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
     throw new Error(`Error al cargar series del usuario: ${errorText}`);
   }
   const data = await response.json();
-  console.log("API (fetchUserSeries): Datos CRUDOS de videos (todos los tipos) recibidos del backend:", data);
-  
   return data
-    .filter(v => v.tipo === "serie") // Filtrado en frontend
-    .map(v => {
-        console.log("API (fetchUserSeries): Mapeando serie del backend:", v);
-        if (!v || typeof v._id === 'undefined') {
-            console.warn("API (fetchUserSeries): Serie del backend SIN _id o item nulo:", v);
-        }
-        return { 
-            id: v._id, 
-            name: v.title,
-            title: v.title,
-            thumbnail: v.logo || v.thumbnail || "", 
-            url: v.url, 
-            category: v.category || "general",
-            description: v.description || "",
-            trailerUrl: v.trailerUrl || ""  
-        };
-    });
+    .filter(v => v.tipo === "serie")
+    .map(v => ({ 
+        id: v._id, name: v.title, title: v.title,
+        thumbnail: v.logo || v.thumbnail || "", url: v.url, 
+        category: v.category || "general", description: v.description || "",
+        trailerUrl: v.trailerUrl || "",
+        genres: v.genres || [],
+        mainSection: v.mainSection 
+    }));
 }
 
-// --- Funciones para contenido destacado PÚBLICO (NO requieren token) ---
+// --- Funciones para Secciones de Contenido (Requieren autenticación para filtrar por plan) ---
 
-export async function fetchFeaturedChannels() {
-  console.log("API (fetchFeaturedChannels): Fetching featured channels from:", `${API_BASE_URL}/api/channels/list`);
-  const response = await fetch(`${API_BASE_URL}/api/channels/list`); // Usa el endpoint público existente
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar canales destacados.`);
-    console.error(`Error al cargar canales destacados: ${response.status}`, errorText);
-    throw new Error(`Error al cargar canales destacados: ${errorText}`);
-  }
-  const data = await response.json();
-  console.log("API (fetchFeaturedChannels): Datos CRUDOS de canales destacados recibidos del backend:", data);
-
-  return data.map(c => {
-    console.log("API (fetchFeaturedChannels): Mapeando canal destacado del backend:", c);
-    // Los canales en la respuesta pública de /api/channels/list ya vienen con 'id' y 'thumbnail' según tu backend.
-    // Pero verificamos por si acaso la estructura cambia o hay inconsistencias.
-    if (!c || (typeof c.id === 'undefined' && typeof c._id === 'undefined')) {
-        console.warn("API (fetchFeaturedChannels): Canal destacado del backend SIN id o _id, o item nulo:", c);
-    }
-    return { 
-      id: c.id || c._id, // El backend en /api/channels/list ya mapea _id a id
-      name: c.name, 
-      thumbnail: c.thumbnail || c.logo || "", // El backend ya debería enviar 'thumbnail'
-      url: c.url, 
-      category: c.category || "general",
-      description: c.description || "",
-      trailerUrl: "" // Los canales usualmente no tienen tráiler
-    };
-  });
-}
-
-export async function fetchFeaturedMovies() {
-  console.log("API (fetchFeaturedMovies): Fetching featured movies from:", `${API_BASE_URL}/api/videos/public/featured-movies`);
-  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-movies`);
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar películas destacadas.`);
-    console.error(`Error al cargar películas destacadas: ${response.status}`, errorText);
-    throw new Error(`Error al cargar películas destacadas: ${errorText}`);
-  }
-  const data = await response.json();
-  console.log("API (fetchFeaturedMovies): Datos CRUDOS de películas destacadas recibidos del backend:", data);
-
-  return data.map(v => {
-    console.log("API (fetchFeaturedMovies): Mapeando película destacada del backend:", v);
-    // El backend en /api/videos/public/featured-movies ya mapea _id a id y otros campos
-    // Pero verificamos por si acaso. El error sugiere que v._id (o el 'id' mapeado) es el problema.
-    if (!v || (typeof v.id === 'undefined' && typeof v._id === 'undefined')) {
-        console.warn("API (fetchFeaturedMovies): Película destacada del backend SIN id o _id, o item nulo:", v);
-    }
-    return { 
-      id: v.id || v._id, // El backend en la ruta pública ya mapea _id a id
-      name: v.title, 
-      title: v.title,
-      thumbnail: v.thumbnail || v.logo || "", // El backend ya debería enviar 'thumbnail'
-      url: v.url, 
-      category: v.category || "general",
-      description: v.description || "",
-      trailerUrl: v.trailerUrl || "" 
-    };
-  });
-}
-
-export async function fetchFeaturedSeries() {
-  console.log("API (fetchFeaturedSeries): Fetching featured series from:", `${API_BASE_URL}/api/videos/public/featured-series`);
-  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-series`);
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => `Error ${response.status} al cargar series destacadas.`);
-    console.error(`Error al cargar series destacadas: ${response.status}`, errorText);
-    throw new Error(`Error al cargar series destacadas: ${errorText}`);
-  }
-  const data = await response.json();
-  console.log("API (fetchFeaturedSeries): Datos CRUDOS de series destacadas recibidas del backend:", data);
-  
-  return data.map(v => {
-    console.log("API (fetchFeaturedSeries): Mapeando serie destacada del backend:", v);
-    if (!v || (typeof v.id === 'undefined' && typeof v._id === 'undefined')) {
-        console.warn("API (fetchFeaturedSeries): Serie destacada del backend SIN id o _id, o item nulo:", v);
-    }
-    return { 
-      id: v.id || v._id, // El backend en la ruta pública ya mapea _id a id
-      name: v.title,
-      title: v.title,
-      thumbnail: v.thumbnail || v.logo || "", // El backend ya debería enviar 'thumbnail'
-      url: v.url, 
-      category: v.category || "general",
-      description: v.description || "",
-      trailerUrl: v.trailerUrl || "" 
-    };
-  });
-}
-
-// src/utils/api.js
-
-// ... (tus otras funciones existentes: getAuthHeaders, fetchUserChannels, fetchUserMovies, 
-// fetchUserSeries, fetchFeaturedChannels, fetchFeaturedMovies, fetchFeaturedSeries) ...
-
-
-// --- NUEVA FUNCIÓN para obtener las secciones principales de películas ---
 export async function fetchMainMovieSections() {
-  // Asumimos que getAuthHeaders() está definido en este archivo y obtiene el token si existe
   const headers = getAuthHeaders(); 
-  // Si esta ruta debe ser pública, puedes omitir el token o manejarlo opcionalmente en el backend.
-  // Por ahora, asumimos que necesita el token para saber qué secciones mostrar basadas en el plan del usuario.
-
   console.log("API: Fetching main movie sections from:", `${API_BASE_URL}/api/videos/main-sections`);
   try {
     const response = await fetch(`${API_BASE_URL}/api/videos/main-sections`, { headers });
-    
     if (!response.ok) {
-      const errorText = await response.text().catch(() => `Error ${response.status} al cargar secciones principales de películas.`);
-      console.error(`Error al cargar secciones principales de películas: ${response.status}`, errorText);
-      // Lanza un error para que sea capturado por el `catch` en MoviesPage.jsx
+      const errorText = await response.text().catch(() => `Error ${response.status}`);
       throw new Error(`Error ${response.status}: ${errorText}`);
     }
-    
-    const data = await response.json();
-    console.log("API: Secciones principales de películas recibidas:", data);
-    return data; // Devuelve los datos directamente (un array de objetos de sección)
-
+    return response.json();
   } catch (error) {
     console.error("API: Fallo en fetchMainMovieSections -", error.message);
-    // En caso de error, puedes devolver un array vacío o un conjunto de secciones por defecto
-    // para evitar que la UI se rompa completamente. O relanzar el error para que MoviesPage.jsx lo maneje.
-    // throw error; // Opción: relanzar para que MoviesPage.jsx muestre el error
-    return [ // Opción: devolver un default para que la UI no se rompa totalmente
-        { key: "POR_GENERO", displayName: "POR GÉNEROS (Error al cargar)", thumbnailSample: "/img/placeholders/por_generos.jpg", requiresPlan: "basico", order: 99 },
-        // Podrías añadir más secciones por defecto o simplemente un array vacío []
-    ]; 
+    return [{ key: "ERROR_MOVIES", displayName: "GÉNEROS (Error)", thumbnailSample: "/img/placeholders/error.jpg", requiresPlan: "gplay", order: 99 }]; 
   }
 }
-// --- FIN NUEVA FUNCIÓN ---
+
+export async function fetchMainChannelSectionsForUser() {
+  const headers = getAuthHeaders(); 
+  console.log("API: Fetching main channel sections for user from:", `${API_BASE_URL}/api/channels/main-sections`);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/channels/main-sections`, { headers });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Error ${response.status}`);
+      throw new Error(`Error ${response.status}: ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error("API: Fallo en fetchMainChannelSectionsForUser -", error.message);
+    return [{ key: "ERROR_CHANNELS", displayName: "SECCIONES (Error)", thumbnailSample: "/img/placeholders/error.jpg", requiresPlan: "gplay", order: 99, categoriesIncluded: [] }]; 
+  }
+}
+
+// --- Funciones para Contenido Destacado PÚBLICO (NO requieren token) ---
+
+export async function fetchFeaturedChannels() {
+  // Este endpoint en el backend debería devolver solo canales marcados como 'isFeatured: true' y 'active: true'
+  const response = await fetch(`${API_BASE_URL}/api/channels/list?featured=true`); // Ajusta el endpoint si es necesario
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar canales destacados: ${errorText}`);
+  }
+  const data = await response.json();
+  return data.map(c => ({ 
+    id: c.id || c._id, name: c.name, thumbnail: c.thumbnail || c.logo || "", 
+    url: c.url, category: c.category || "general", description: c.description || ""
+  }));
+}
+
+export async function fetchFeaturedMovies() {
+  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-movies`);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar películas destacadas: ${errorText}`);
+  }
+  const data = await response.json();
+  return data.map(v => ({ 
+    id: v.id || v._id, name: v.title, title: v.title, 
+    thumbnail: v.thumbnail || v.logo || "", url: v.url, 
+    category: v.category || "general", description: v.description || "",
+    trailerUrl: v.trailerUrl || "" 
+  }));
+}
+
+export async function fetchFeaturedSeries() {
+  const response = await fetch(`${API_BASE_URL}/api/videos/public/featured-series`);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar series destacadas: ${errorText}`);
+  }
+  const data = await response.json();
+  return data.map(v => ({ 
+    id: v.id || v._id, name: v.title, title: v.title, 
+    thumbnail: v.thumbnail || v.logo || "", url: v.url, 
+    category: v.category || "general", description: v.description || "",
+    trailerUrl: v.trailerUrl || "" 
+  }));
+}
+
+
+// --- FUNCIONES PARA ADMIN PANEL (CANALES) ---
+
+export async function fetchAdminChannels() {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) {
+    console.warn("fetchAdminChannels: No hay token.");
+    throw new Error("No autenticado para cargar canales de admin.");
+  }
+  // URL Corregida: /api/channels/admin/list (porque channelsRoutes se monta en /api/channels)
+  const response = await fetch(`${API_BASE_URL}/api/channels/admin/list`, { headers });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status} al cargar canales para admin.`);
+    throw new Error(`Error al cargar canales para admin: ${response.status} ${errorText}`);
+  }
+  const data = await response.json();
+  // El backend en /api/channels/admin/list ya debería devolver 'id', '_id', etc.
+  return data; // Asumimos que el backend ya mapea si es necesario.
+}
+
+export async function createAdminChannel(channelData) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para crear canal.");
+  
+  // URL Corregida: /api/channels/admin
+  const response = await fetch(`${API_BASE_URL}/api/channels/admin`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(channelData)
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status} al crear canal.` }));
+    throw new Error(errorData.error || `Error ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updateAdminChannel(channelId, channelData) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para actualizar canal.");
+
+  // URL Corregida: /api/channels/admin/:id
+  const response = await fetch(`${API_BASE_URL}/api/channels/admin/${channelId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(channelData)
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status} al actualizar canal.` }));
+    throw new Error(errorData.error || `Error ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function deleteAdminChannel(channelId) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para eliminar canal.");
+
+  // URL Corregida: /api/channels/admin/:id
+  const response = await fetch(`${API_BASE_URL}/api/channels/admin/${channelId}`, {
+    method: 'DELETE',
+    headers
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status} al eliminar canal.` }));
+    throw new Error(errorData.error || `Error ${response.status}`);
+  }
+  return response.json(); 
+}
+
+export async function processM3UForAdmin(formData) {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No autenticado para procesar M3U.");
+
+    // Para FormData, no establecemos Content-Type manualmente.
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    // URL Corregida: /api/channels/admin/process-m3u (si defines esta ruta en channels.routes.js)
+    // O podría ser /api/m3u/process-admin o similar si usas m3u.routes.js
+    const response = await fetch(`${API_BASE_URL}/api/channels/admin/process-m3u`, {
+        method: 'POST',
+        headers: headers, // Solo Authorization
+        body: formData
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Error ${response.status} al procesar M3U.`}));
+        throw new Error(errorData.error || `Error ${response.status}`);
+    }
+    return response.json();
+}
+
+// --- FUNCIONES PARA ADMIN PANEL (VOD - Películas/Series) ---
+// (Asumiendo que tus rutas VOD para admin están bajo /api/videos y el backend maneja el rol)
+
+export async function fetchAdminVideos() {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para cargar VODs de admin.");
+  const response = await fetch(`${API_BASE_URL}/api/videos?view=admin`, { headers }); // Asumiendo ?view=admin para obtener todos
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `Error ${response.status}`);
+    throw new Error(`Error al cargar VODs para admin: ${errorText}`);
+  }
+  return response.json(); // Asumimos que el backend devuelve el formato necesario
+}
+
+export async function createAdminVideo(videoData) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para crear VOD.");
+  // Tu backend en /api/videos/upload-link ya maneja esto
+  const response = await fetch(`${API_BASE_URL}/api/videos/upload-link`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(videoData)
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status}`}));
+    throw new Error(errorData.error || `Error ${response.status} al crear VOD.`);
+  }
+  return response.json();
+}
+
+export async function updateAdminVideo(videoId, videoData) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para actualizar VOD.");
+  const response = await fetch(`${API_BASE_URL}/api/videos/${videoId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(videoData)
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status}`}));
+    throw new Error(errorData.error || `Error ${response.status} al actualizar VOD.`);
+  }
+  return response.json();
+}
+
+export async function deleteAdminVideo(videoId) {
+  const headers = getAuthHeaders();
+  if (!headers.Authorization) throw new Error("No autenticado para eliminar VOD.");
+  const response = await fetch(`${API_BASE_URL}/api/videos/${videoId}`, {
+    method: 'DELETE',
+    headers
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Error ${response.status}`}));
+    throw new Error(errorData.error || `Error ${response.status} al eliminar VOD.`);
+  }
+  return response.json();
+}
