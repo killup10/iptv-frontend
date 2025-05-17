@@ -1,17 +1,24 @@
 // src/pages/AdminPanel.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { 
+    // Funciones para Canales
+    fetchAdminChannels, 
+    createAdminChannel, 
+    updateAdminChannel, 
+    deleteAdminChannel, 
+    processM3UForAdmin,
+    // Funciones para VODs (Películas/Series)
+    fetchAdminVideos, 
+    createAdminVideo, 
+    updateAdminVideo, 
+    deleteAdminVideo 
+} from "../utils/api.js"; // Asegúrate que estas funciones estén definidas en tu api.js
 
-// --- Tus Componentes UI (Tab, Input, Textarea, Select, Button) ---
-// (Asegúrate de que estén definidos como antes o importados)
+// --- Componentes UI (como los tenías) ---
 const Tab = ({ label, value, activeTab, onTabChange }) => (
-  <button
-    onClick={() => onTabChange(value)}
-    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors duration-150 whitespace-nowrap
-      ${activeTab === value 
-        ? 'border-b-2 border-red-500 text-white' 
-        : 'text-gray-400 hover:text-gray-200 hover:border-b-2 hover:border-gray-500'}`}
-  >
+  <button onClick={() => onTabChange(value)}
+    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors duration-150 whitespace-nowrap ${activeTab === value ? 'border-b-2 border-red-500 text-white' : 'text-gray-400 hover:text-gray-200 hover:border-b-2 hover:border-gray-500'}`}>
     {label}
   </button>
 );
@@ -19,31 +26,46 @@ const Input = (props) => <input {...props} className={`w-full p-3 bg-gray-700 ro
 const Textarea = (props) => <textarea {...props} className={`w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:ring-1 focus:ring-red-500 focus:border-red-500 text-white placeholder-gray-400 h-24 ${props.className || ""}`} />;
 const Select = (props) => <select {...props} className={`w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:ring-1 focus:ring-red-500 focus:border-red-500 text-white ${props.className || ""}`} />;
 const Button = ({ children, className, disabled, ...props }) => (
-    <button 
-        {...props} 
-        disabled={disabled}
-        className={`font-bold py-2 px-4 rounded transition-colors duration-150 ease-in-out ${className || ""} ${disabled ? "bg-gray-500 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
-    >
+    <button {...props} disabled={disabled}
+        className={`font-bold py-2 px-4 rounded transition-colors duration-150 ease-in-out ${className || ""} ${disabled ? "bg-gray-500 text-gray-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white"}`}>
         {children}
     </button>
 );
 
-// Coincidir con el backend (Video.model.js enum y ALL_POSSIBLE_SECTIONS en videos.routes.js)
-const MAIN_SECTION_OPTIONS = [
+// Opciones para Selects
+const MAIN_SECTION_VOD_OPTIONS = [
     { key: "POR_GENERO", displayName: "POR GÉNEROS (Agrupador)"},
     { key: "ESPECIALES", displayName: "ESPECIALES (Festividades)"},
     { key: "CINE_2025", displayName: "CINE 2025 (Estrenos)"},
     { key: "CINE_4K", displayName: "CINE 4K"},
     { key: "CINE_60FPS", displayName: "CINE 60 FPS"},
+    // Agrega más según tu backend para VODs
+];
+
+const CHANNEL_CATEGORY_OPTIONS = [
+    "GENERAL", "NOTICIAS", "DEPORTES", "PELIS", "SERIES", "INFANTILES", 
+    "CULTURA", "DOCUMENTALES", "MUSICA", "VARIADOS", "LOCALES", "NOVELAS", "INFORMATIVO",
+    "NOTICIAS BASICAS", "INFANTILES BASICOS", "ENTRETENIMIENTO GENERAL", "DEPORTES PREMIUM",
+    "EVENTOS DEPORTIVOS", "FUTBOL EXCLUSIVO", "VARIADOS PREMIUM", "ENTRETENIMIENTO VIP",
+    "PELIS PREMIUM", "ESTRENOS CINE", "INFANTILES PREMIUM", "FUTBOL TOTAL",
+    "CULTURA PREMIUM", "DOCUMENTALES VIP", "NOTICIAS INTERNACIONALES", "FINANZAS",
+    "SIN CATEGORIA"
+];
+
+const PLAN_OPTIONS = [
+    { key: "gplay", displayName: "GPlay (Base)" },
+    { key: "cinefilo", displayName: "Cinéfilo" },
+    { key: "sports", displayName: "Sports" },
+    { key: "premium", displayName: "Premium" },
 ];
 
 export default function AdminPanel() {
   const { user } = useAuth();
-  const token = user?.token;
-  const API_URL = import.meta.env.VITE_API_URL;
+  const token = user?.token; // AuthContext ya debería proveer el token
   
-  // ... (todos tus otros estados: m3uFile, vodId, videoTitle, etc.) ...
   const [m3uFile, setM3uFile] = useState(null);
+  
+  // Estados VOD
   const [vodId, setVodId] = useState(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -54,168 +76,202 @@ export default function AdminPanel() {
   const [videoIsFeatured, setVideoIsFeatured] = useState(false);
   const [videoIsActive, setVideoIsActive] = useState(true);
   const [videoTipo, setVideoTipo] = useState("pelicula");
-  const [videoMainSection, setVideoMainSection] = useState("POR_GENERO"); // Default
+  const [videoMainSection, setVideoMainSection] = useState(MAIN_SECTION_VOD_OPTIONS[0]?.key || "POR_GENERO");
   const [videoGenres, setVideoGenres] = useState("");
-  const [videoRequiresPlan, setVideoRequiresPlan] = useState("basico");
+  const [videoRequiresPlan, setVideoRequiresPlan] = useState(PLAN_OPTIONS[0]?.key || "gplay");
 
+  // Estados Canales
   const [channelId, setChannelId] = useState(null);
   const [channelName, setChannelName] = useState("");
-  // ... (más estados de canal)
+  const [channelUrl, setChannelUrl] = useState("");
+  const [channelLogo, setChannelLogo] = useState("");
+  const [channelDescription, setChannelDescription] = useState(""); // Añadido para descripción de canal
+  const [channelCategory, setChannelCategory] = useState(CHANNEL_CATEGORY_OPTIONS[0]);
+  const [channelIsActive, setChannelIsActive] = useState(true);
+  const [channelIsFeatured, setChannelIsFeatured] = useState(false);
+  const [channelRequiresPlan, setChannelRequiresPlan] = useState(PLAN_OPTIONS[0]?.key || "gplay");
 
   const [channels, setChannels] = useState([]);
-  const [videos, setVideos] = useState([]); // Este es el estado para la lista de VODs
+  const [videos, setVideos] = useState([]);
+
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
-  const [activeTab, setActiveTab] = useState("manage_vod"); // Iniciar en Gestionar VOD
-
-  const getAuthHeaders = useCallback((isFormData = false) => {
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (!isFormData) headers['Content-Type'] = 'application/json';
-    return headers;
-  }, [token]);
+  
+  const [activeTab, setActiveTab] = useState("manage_channels"); // Iniciar en canales para probar
 
   const clearMessages = () => { setErrorMsg(""); setSuccessMsg(""); };
 
-  const fetchChannels = useCallback(async () => { /* ... (tu función fetchChannels) ... */ }, [token, API_URL, getAuthHeaders]);
-  
-  const fetchVideos = useCallback(async () => {
-    if (!token) return;
-    setIsLoadingList(true); 
-    clearMessages();
-    console.log("AdminPanel: Iniciando fetchVideos...");
+  // --- Funciones para Canales ---
+  const fetchAdminChannelsList = useCallback(async () => {
+    if (!token) { setErrorMsg("No autenticado."); return; }
+    setIsLoadingList(true); clearMessages();
     try {
-      const res = await fetch(`${API_URL}/api/videos?view=admin`, { headers: getAuthHeaders() });
-      const responseText = await res.text();
-      console.log(`AdminPanel fetchVideos - Respuesta TEXTO (Status ${res.status}):`, responseText);
-
-      if (!res.ok) {
-          let errorDetail = `Error ${res.status} del servidor.`;
-          try {
-              const parsedError = JSON.parse(responseText);
-              errorDetail = parsedError.error || errorDetail;
-          } catch (e) { /* No hacer nada si no es JSON */ }
-          throw new Error(`Error al cargar VODs para admin: ${errorDetail}`);
-      }
-
-      const data = JSON.parse(responseText);
-      console.log("AdminPanel - fetchVideos - Datos VOD PARSEADOS para la lista:", data);
-      
-      if (Array.isArray(data)) {
-        setVideos(data);
-        if (data.length === 0) {
-            console.log("AdminPanel fetchVideos: El backend devolvió un array vacío para los VODs.");
-        }
-      } else {
-        console.error("AdminPanel fetchVideos: La respuesta del backend no es un array:", data);
-        setVideos([]); // Establecer a array vacío si la data no es un array
-        setErrorMsg("Formato de datos incorrecto recibido del servidor para VODs.");
-      }
-
+      const data = await fetchAdminChannels();
+      setChannels(data || []);
+      if (!data || data.length === 0) setSuccessMsg("No se encontraron canales.");
     } catch (err) { 
-      console.error("AdminPanel fetchVideos - CATCH Error:", err);
-      setErrorMsg(err.message || "Fallo al cargar VODs."); 
-      setVideos([]);
-    } finally { 
-      setIsLoadingList(false); 
-      console.log("AdminPanel: fetchVideos finalizado.");
-    }
-  }, [token, API_URL, getAuthHeaders]);
+      setErrorMsg(err.message || "Fallo al cargar lista de canales."); setChannels([]);
+    } finally { setIsLoadingList(false); }
+  }, [token]);
 
-  useEffect(() => {
+  const clearChannelForm = useCallback(() => {
+    setChannelId(null); setChannelName(""); setChannelUrl(""); setChannelLogo("");
+    setChannelDescription(""); setChannelCategory(CHANNEL_CATEGORY_OPTIONS[0]);
+    setChannelIsActive(true); setChannelIsFeatured(false);
+    setChannelRequiresPlan(PLAN_OPTIONS[0]?.key || "gplay");
     clearMessages();
-    if (user && user.role === 'admin' && token) { // Asegurarse que el usuario sea admin
-      if (activeTab === "manage_channels") {
-        fetchChannels();
-      } else if (activeTab === "add_channel" && !channelId) {
-        clearChannelForm();
-      }
-      
-      if (activeTab === "manage_vod") {
-        fetchVideos(); // Llamar aquí cuando la pestaña se active
-      } else if (activeTab === "add_vod" && !vodId) {
-        clearVodForm();
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, token, user]); // Quitar channelId y vodId para evitar llamadas múltiples si fetchVideos/Channels no están en useCallback
-                               // O añadir fetchVideos/Channels a las dependencias si están con useCallback
+  }, []);
 
-  const submitM3uToChannels = async (e) => { /* ... (tu función) ... */ };
-  const clearChannelForm = () => { /* ... (tu función) ... */ };
-  const handleEditChannelClick = (channel) => { /* ... (tu función) ... */ };
-  const submitChannel = async (e) => { /* ... (tu función) ... */ };
-  const deleteChannel = async (id) => { /* ... (tu función) ... */ };
+  const handleEditChannelClick = useCallback((channel) => {
+    if (!channel || !channel.id) { setErrorMsg("Error: ID de canal inválido."); return; }
+    setChannelId(channel.id);
+    setChannelName(channel.name || "");
+    setChannelUrl(channel.url || "");
+    setChannelLogo(channel.logo || "");
+    setChannelDescription(channel.description || "");
+    setChannelCategory(channel.category || CHANNEL_CATEGORY_OPTIONS[0]);
+    setChannelIsActive(channel.isActive !== undefined ? channel.isActive : true);
+    setChannelIsFeatured(channel.isFeatured || false);
+    setChannelRequiresPlan(channel.requiresPlan || (PLAN_OPTIONS[0]?.key || "gplay"));
+    setActiveTab("add_channel"); 
+    clearMessages();
+  }, []);
 
-  const clearVodForm = () => {
+  const submitChannel = async (e) => {
+    e.preventDefault();
+    if (!channelName || !channelUrl) { setErrorMsg("Nombre y URL del canal son requeridos."); return; }
+    setIsSubmitting(true); clearMessages();
+    const channelData = {
+      name: channelName, url: channelUrl, logo: channelLogo, description: channelDescription,
+      category: channelCategory, isActive: channelIsActive, isFeatured: channelIsFeatured,
+      requiresPlan: channelRequiresPlan,
+    };
+    try {
+      if (channelId) {
+        await updateAdminChannel(channelId, channelData);
+        setSuccessMsg("Canal actualizado.");
+      } else {
+        await createAdminChannel(channelData);
+        setSuccessMsg("Canal agregado.");
+      }
+      clearChannelForm(); 
+      fetchAdminChannelsList(); 
+      setActiveTab("manage_channels");
+    } catch (err) { setErrorMsg(err.message || "Error al guardar canal."); } 
+    finally { setIsSubmitting(false); }
+  };
+  
+  const handleDeleteChannel = async (id) => {
+    if (!id || !window.confirm("¿Eliminar este canal?")) return;
+    setIsSubmitting(true); clearMessages();
+    try {
+      await deleteAdminChannel(id);
+      setSuccessMsg("Canal eliminado.");
+      fetchAdminChannelsList();
+    } catch (err) { setErrorMsg(err.message || "Error al eliminar canal.");} 
+    finally { setIsSubmitting(false); }
+  };
+
+  const submitM3uFileToChannels = async (e) => {
+    e.preventDefault();
+    if (!m3uFile) { setErrorMsg("Selecciona un archivo M3U."); return; }
+    setIsSubmitting(true); clearMessages();
+    const formData = new FormData();
+    formData.append("m3uFile", m3uFile);
+    try {
+      const result = await processM3UForAdmin(formData);
+      setSuccessMsg(result.message || `M3U procesado. Canales: ${result.channelsProcessed || result.channelsAdded || 0}`);
+      setM3uFile(null); 
+      if (document.getElementById('m3u-file-input')) document.getElementById('m3u-file-input').value = "";
+      fetchAdminChannelsList();
+    } catch (err) { setErrorMsg(err.message || "Error al procesar M3U."); } 
+    finally { setIsSubmitting(false); }
+  };
+
+  // --- Funciones para VOD (Películas/Series) ---
+  const fetchVideosList = useCallback(async () => {
+    if (!token) { setErrorMsg("No autenticado."); return; }
+    setIsLoadingList(true); clearMessages();
+    try {
+      const data = await fetchAdminVideos();
+      setVideos(data || []);
+      if (!data || data.length === 0) setSuccessMsg("No se encontraron VODs.");
+    } catch (err) { setErrorMsg(err.message || "Fallo al cargar VODs."); setVideos([]); }
+    finally { setIsLoadingList(false); }
+  }, [token]);
+
+  const clearVodForm = useCallback(() => {
     setVodId(null); setVideoTitle(""); setVideoUrl(""); setVideoLogo("");
     setVideoDescription(""); setVideoTrailerUrl("");
     setVideoReleaseYear(new Date().getFullYear().toString()); setVideoIsFeatured(false); 
     setVideoIsActive(true); setVideoTipo("pelicula");
-    setVideoMainSection("POR_GENERO");
-    setVideoGenres("");
-    setVideoRequiresPlan("basico");
-  };
+    setVideoMainSection(MAIN_SECTION_VOD_OPTIONS[0]?.key || "POR_GENERO");
+    setVideoGenres(""); setVideoRequiresPlan(PLAN_OPTIONS[0]?.key || "gplay");
+    clearMessages();
+  }, []);
 
-  const handleEditVodClick = (video) => {
-    if (!video || (!video.id && !video._id)) {
-        alert("Error: No se puede editar el VOD, falta ID."); return;
-    }
+  const handleEditVodClick = useCallback((video) => {
+    if (!video || (!video.id && !video._id)) { setErrorMsg("Error: ID de VOD inválido."); return; }
     setVodId(video.id || video._id);
-    setVideoTitle(video.title || video.name || "");
-    setVideoUrl(video.url || "");
-    setVideoLogo(video.logo || video.thumbnail || "");
-    setVideoDescription(video.description || "");
+    setVideoTitle(video.title || video.name || ""); setVideoUrl(video.url || "");
+    setVideoLogo(video.logo || video.thumbnail || ""); setVideoDescription(video.description || "");
     setVideoTrailerUrl(video.trailerUrl || "");
     setVideoReleaseYear(video.releaseYear?.toString() || new Date().getFullYear().toString());
     setVideoIsFeatured(video.isFeatured || false);
     setVideoIsActive(video.active !== undefined ? video.active : true);
     setVideoTipo(video.tipo || "pelicula");
-    setVideoMainSection(video.mainSection || "POR_GENERO");
+    setVideoMainSection(video.mainSection || (MAIN_SECTION_VOD_OPTIONS[0]?.key || "POR_GENERO"));
     setVideoGenres(Array.isArray(video.genres) ? video.genres.join(', ') : (video.genres || ""));
-    setVideoRequiresPlan(video.requiresPlan || "basico");
-    setActiveTab("add_vod"); 
-    clearMessages();
-  };
+    setVideoRequiresPlan(video.requiresPlan || (PLAN_OPTIONS[0]?.key || "gplay"));
+    setActiveTab("add_vod"); clearMessages();
+  }, []);
 
   const submitVideo = async (e) => {
     e.preventDefault();
-    if(!videoTitle || !videoUrl) { setErrorMsg("Título y URL son requeridos."); return; }
+    if(!videoTitle || !videoUrl) { setErrorMsg("Título y URL son requeridos para VOD."); return; }
     setIsSubmitting(true); clearMessages();
     const parsedGenres = videoGenres.split(',').map(g => g.trim()).filter(g => g);
-    const videoData = {
+    const vodData = {
       title: videoTitle, url: videoUrl, logo: videoLogo, description: videoDescription,
-      trailerUrl: videoTrailerUrl, 
-      releaseYear: videoReleaseYear ? parseInt(videoReleaseYear) : null,
+      trailerUrl: videoTrailerUrl, releaseYear: videoReleaseYear ? parseInt(videoReleaseYear) : null,
       isFeatured: videoIsFeatured, active: videoIsActive, tipo: videoTipo,
       mainSection: videoMainSection, genres: parsedGenres, requiresPlan: videoRequiresPlan,
     };
-    console.log("AdminPanel: Enviando datos de VOD:", videoData, "al ID:", vodId);
     try {
-      const endpointBase = `${API_URL}/api/videos`;
-      const res = vodId 
-        ? await fetch(`${endpointBase}/${vodId}`, { method: "PUT", headers: getAuthHeaders(), body: JSON.stringify(videoData) })
-        : await fetch(`${endpointBase}/upload-link`, { method: "POST", headers: getAuthHeaders(), body: JSON.stringify(videoData) });
-      const responseData = await res.json();
-      if (!res.ok) throw new Error(responseData.error || responseData.message || `Error ${res.status}`);
-      setSuccessMsg(vodId ? "VOD actualizado." : "VOD agregado.");
-      clearVodForm(); 
-      fetchVideos(); // Volver a cargar la lista después de agregar/editar
-      if(vodId) setActiveTab("manage_vod"); // Regresar a la lista si estaba editando
-    } catch (err) { setErrorMsg(err.message); console.error("Error en submitVideo:", err); } 
+      if (vodId) {
+        await updateAdminVideo(vodId, vodData);
+        setSuccessMsg("VOD actualizado.");
+      } else {
+        await createAdminVideo(vodData);
+        setSuccessMsg("VOD agregado.");
+      }
+      clearVodForm(); fetchVideosList(); 
+      if(vodId) setActiveTab("manage_vod"); 
+    } catch (err) { setErrorMsg(err.message || "Error al guardar VOD."); } 
     finally { setIsSubmitting(false); }
   };
   
   const deleteVideo = async (id) => {
-    if (!window.confirm("¿Eliminar este VOD?")) return;
-    // ... (tu lógica de deleteVideo)
+    if (!id || !window.confirm("¿Eliminar este VOD?")) return;
+    setIsSubmitting(true); clearMessages();
     try {
-      // ...
-      fetchVideos(); // Volver a cargar la lista después de eliminar
-    } catch (err) { /* ... */ }
+        await deleteAdminVideo(id);
+        setSuccessMsg("VOD eliminado."); fetchVideosList();
+    } catch (err) { setErrorMsg(err.message || "Error al eliminar VOD."); } 
+    finally { setIsSubmitting(false); }
   };
+
+  useEffect(() => {
+    clearMessages();
+    if (user && user.role === 'admin' && token) {
+      if (activeTab === "manage_channels") fetchAdminChannelsList();
+      else if (activeTab === "add_channel" && !channelId) clearChannelForm();
+      else if (activeTab === "manage_vod") fetchVideosList();
+      else if (activeTab === "add_vod" && !vodId) clearVodForm();
+    }
+  }, [activeTab, token, user, channelId, vodId, fetchAdminChannelsList, clearChannelForm, fetchVideosList, clearVodForm]); // Añadidas las funciones de useCallback como dependencias
 
   if (!token || !user || user.role !== "admin") {
     return <div className="flex justify-center items-center min-h-screen"><p className="p-8 text-xl bg-red-900 text-red-200 rounded-md">Acceso denegado.</p></div>;
@@ -224,101 +280,174 @@ export default function AdminPanel() {
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-8 max-w-5xl mx-auto bg-gray-900 text-white min-h-screen">
       <h1 className="text-3xl md:text-4xl font-bold text-center text-red-500">Panel de Administración</h1>
-      {errorMsg && <div className="p-3 my-4 bg-red-200 text-red-800 border border-red-400 rounded-md shadow-lg" role="alert">{errorMsg}</div>}
-      {successMsg && <div className="p-3 my-4 bg-green-200 text-green-800 border border-green-400 rounded-md shadow-lg" role="alert">{successMsg}</div>}
+      {errorMsg && <div className="p-3 my-2 bg-red-800 text-red-100 border border-red-700 rounded-md shadow-lg" role="alert">{errorMsg}</div>}
+      {successMsg && <div className="p-3 my-2 bg-green-800 text-green-100 border border-green-700 rounded-md shadow-lg" role="alert">{successMsg}</div>}
       
       <div className="flex flex-wrap justify-center border-b border-gray-700 mb-6">
-        {/* ... Tus Tabs ... */}
-        <Tab label="Subir M3U (a Canales)" value="m3u_to_channels" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label={channelId ? "Editar Canal" : "Agregar Canal"} value="add_channel" activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); if(!channelId && tab === 'add_channel') { clearChannelForm(); clearMessages();} }} />
-        <Tab label="Gestionar Canales" value="manage_channels" activeTab={activeTab} onTabChange={(tab) => {setActiveTab(tab); clearMessages(); fetchChannels();}} />
-        <Tab label={vodId ? "Editar VOD" : "Agregar VOD"} value="add_vod" activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); if(!vodId && tab === 'add_vod') {clearVodForm(); clearMessages();}}} />
-        <Tab label="Gestionar VOD" value="manage_vod" activeTab={activeTab} onTabChange={(tab) => {setActiveTab(tab); clearMessages(); fetchVideos();}} />
+        <Tab label="Subir M3U (Canales)" value="m3u_to_channels" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label={channelId ? "Editar Canal" : "Agregar Canal"} value="add_channel" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Gestionar Canales" value="manage_channels" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label={vodId ? "Editar VOD" : "Agregar VOD"} value="add_vod" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Gestionar VOD" value="manage_vod" activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
-      {/* ... (Renderizado condicional de las pestañas) ... */}
+      {/* Pestaña Subir M3U */}
+      {activeTab === "m3u_to_channels" && (
+        <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
+          <h2 className="text-2xl font-semibold mb-4">Subir Archivo M3U para Crear/Actualizar Canales</h2>
+          <form onSubmit={submitM3uFileToChannels} className="space-y-4">
+            <Input id="m3u-file-input" type="file" accept=".m3u,.m3u8" 
+              onChange={(e) => setM3uFile(e.target.files[0])} 
+              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-500 file:text-white hover:file:bg-red-600 cursor-pointer"
+            />
+            <Button type="submit" disabled={isSubmitting || !m3uFile} className="bg-purple-600 hover:bg-purple-700">
+              {isSubmitting ? "Procesando M3U..." : "Subir y Procesar M3U"}
+            </Button>
+          </form>
+        </section>
+      )}
 
-      {/* Pestaña Gestionar VOD - CON CORRECCIÓN DE SINTAXIS Y LOGS */}
+      {/* Pestaña Agregar/Editar Canal */}
+      {activeTab === "add_channel" && (
+        <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
+          <h2 className="text-2xl font-semibold mb-4">{channelId ? "Editar Canal" : "Agregar Nuevo Canal"}</h2>
+          <form onSubmit={submitChannel} className="space-y-4">
+            <Input type="text" placeholder="Nombre del Canal" value={channelName} onChange={(e) => setChannelName(e.target.value)} required />
+            <Input type="url" placeholder="URL del Stream (m3u8, etc.)" value={channelUrl} onChange={(e) => setChannelUrl(e.target.value)} required />
+            <Input type="url" placeholder="URL del Logo/Thumbnail" value={channelLogo} onChange={(e) => setChannelLogo(e.target.value)} />
+            <Textarea placeholder="Descripción (Opcional)" value={channelDescription} onChange={(e) => setChannelDescription(e.target.value)} />
+            <div>
+              <label htmlFor="channelCategoryAdmin" className="block text-sm font-medium text-gray-300 mb-1">Categoría del Canal</label>
+              <Select id="channelCategoryAdmin" value={channelCategory} onChange={(e) => setChannelCategory(e.target.value)}>
+                {CHANNEL_CATEGORY_OPTIONS.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="channelRequiresPlanAdmin" className="block text-sm font-medium text-gray-300 mb-1">Plan Requerido</label>
+              <Select id="channelRequiresPlanAdmin" value={channelRequiresPlan} onChange={(e) => setChannelRequiresPlan(e.target.value)}>
+                {PLAN_OPTIONS.map(plan => (<option key={plan.key} value={plan.key}>{plan.displayName}</option>))}
+              </Select>
+            </div>
+            <label className="flex items-center space-x-2 text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={channelIsActive} onChange={(e) => setChannelIsActive(e.target.checked)} className="form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"/>
+                <span>Activo</span>
+            </label>
+            <label className="flex items-center space-x-2 text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={channelIsFeatured} onChange={(e) => setChannelIsFeatured(e.target.checked)} className="form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"/>
+                <span>Destacado (Mostrar en Home)</span>
+            </label>
+            <div className="flex gap-4 pt-2">
+                <Button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
+                    {isSubmitting ? (channelId ? "Actualizando..." : "Agregando...") : (channelId ? "Actualizar Canal" : "Agregar Canal")}
+                </Button>
+                {channelId && <Button type="button" onClick={() => { clearChannelForm(); setActiveTab("manage_channels");}} className="bg-gray-600 hover:bg-gray-700">Cancelar Edición</Button>}
+            </div>
+          </form>
+        </section>
+      )}
+
+      {/* Pestaña Gestionar Canales */}
+      {activeTab === "manage_channels" && (
+        <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
+          <h2 className="text-2xl font-semibold mb-4">Gestionar Canales Existentes</h2>
+           {isLoadingList ? (<p className="text-center text-gray-400">Cargando canales...</p>)
+            : (channels && channels.length > 0) ? (
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2"> 
+              {channels.map((ch) => (
+                <div key={ch.id || ch._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 rounded-md gap-2">
+                  <img src={ch.logo || '/img/placeholder-thumbnail.png'} alt={ch.name} 
+                    className="w-24 h-16 object-contain bg-black rounded-sm mr-3 flex-shrink-0 self-center sm:self-start"
+                    onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}/>
+                  <div className="flex-grow mb-2 sm:mb-0 text-sm">
+                    <strong className={`text-base ${!ch.isActive ? 'text-gray-500 line-through' : 'text-white'}`}>{ch.name}</strong> 
+                    <p className="text-xs text-gray-400 truncate max-w-xs sm:max-w-md md:max-w-lg" title={ch.url}>{ch.url}</p>
+                    <p className="text-xs text-gray-500">Cat: {ch.category} | Plan: {PLAN_OPTIONS.find(p=>p.key === ch.requiresPlan)?.displayName || ch.requiresPlan}</p>
+                    <p className="text-xs text-gray-500">{ch.isActive ? "Activo" : "Inactivo"} - {ch.isFeatured ? "Destacado" : "No Dest."}</p>
+                    {ch.description && <p className="text-xs text-gray-300 mt-1 line-clamp-1" title={ch.description}>Desc: {ch.description}</p>}
+                  </div>
+                  <div className="flex space-x-2 flex-shrink-0 self-center sm:self-auto">
+                    <Button onClick={() => handleEditChannelClick(ch)} className="bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1">Editar</Button>
+                    <Button onClick={() => handleDeleteChannel(ch.id || ch._id)} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-xs px-3 py-1">Eliminar</Button>
+                  </div>
+                </div>
+              ))}
+            </div> 
+            ) : (<p className="text-gray-400 text-center py-10">{errorMsg ? `Error: ${errorMsg}` : "No hay canales."}</p>)}
+        </section>
+      )}
+
+      {/* Pestaña Gestionar VOD */}
       {activeTab === "manage_vod" && (
         <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
           <h2 className="text-2xl font-semibold mb-4">Gestionar VOD Existente (Películas/Series)</h2>
-           {isLoadingList ? (
-            <p className="text-center text-gray-400">Cargando VODs...</p>
-           ) : (videos && videos.length > 0) ? (
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2"> 
+            {isLoadingList ? (<p className="text-center text-gray-400">Cargando VODs...</p>)
+            : (videos && videos.length > 0) ? (
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2"> 
               {videos.map((vid) => (
                 <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 rounded-md gap-2">
-                  <img 
-                    src={vid.thumbnail || vid.logo || '/img/placeholder-thumbnail.png'} 
-                    alt={vid.title || vid.name} 
+                  <img src={vid.thumbnail || vid.logo || '/img/placeholder-thumbnail.png'} alt={vid.title || vid.name} 
                     className="w-16 h-24 object-cover bg-black rounded-sm mr-3 flex-shrink-0" 
-                    onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}
-                  />
-                  <div className="flex-grow mb-2 sm:mb-0">
-                    <strong className={`text-lg ${vid.active ? 'text-white' : 'text-gray-500 line-through'}`}>
-                        {vid.title || vid.name}
-                    </strong> 
-                    <span className="text-xs text-gray-400 ml-2">({vid.tipo})</span>
+                    onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}/>
+                  <div className="flex-grow mb-2 sm:mb-0 text-sm">
+                    <strong className={`text-base ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`}>{vid.title || vid.name}</strong> 
+                    <span className="text-xs text-gray-400 ml-1">({vid.tipo})</span>
                     <p className="text-xs text-gray-400 truncate max-w-xs sm:max-w-md md:max-w-lg" title={vid.url}>{vid.url}</p>
-                    <p className="text-xs text-gray-500">Sección: {vid.mainSection || 'N/A'} | Plan: {vid.requiresPlan || 'N/A'}</p>
+                    <p className="text-xs text-gray-500">Sección: {MAIN_SECTION_VOD_OPTIONS.find(s=>s.key === vid.mainSection)?.displayName || vid.mainSection || 'N/A'} | Plan: {PLAN_OPTIONS.find(p=>p.key === vid.requiresPlan)?.displayName || vid.requiresPlan}</p>
                     <p className="text-xs text-gray-500">Géneros: {Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</p>
                     <p className="text-xs text-gray-500">{vid.active ? "Activo" : "Inactivo"} - {vid.isFeatured ? "Destacado" : "No Dest."}</p>
                   </div>
                   <div className="flex space-x-2 flex-shrink-0 self-center sm:self-auto">
                     <Button onClick={() => handleEditVodClick(vid)} className="bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1">Editar</Button>
-                    <Button onClick={() => deleteVideo(vid.id || vid._id)} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1">Eliminar</Button>
+                    <Button onClick={() => deleteVideo(vid.id || vid._id)} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-xs px-3 py-1">Eliminar</Button>
                   </div>
                 </div>
               ))}
             </div> 
-            ) : ( // Este es el 'else' del ternario (videos && videos.length > 0)
-            <p className="text-gray-400 text-center py-10">
-                {errorMsg ? `Error: ${errorMsg}` : "No hay VODs (películas/series) para mostrar o no se pudieron cargar."}
-            </p>
-            )
-           }
+            ) : (<p className="text-gray-400 text-center py-10">{errorMsg ? `Error: ${errorMsg}` : "No hay VODs."}</p>)}
         </section>
       )}
-      {/* ... (resto de las pestañas Add/Edit VOD, M3U, Canales, etc., como las tenías con las correcciones anteriores) ... */}
+
+      {/* Pestaña Agregar/Editar VOD */}
         {activeTab === "add_vod" && (
         <section className="p-6 bg-gray-800 rounded-lg shadow-xl">
           <h2 className="text-2xl font-semibold mb-4">{vodId ? "Editar VOD" : "Agregar Película o Serie"}</h2>
           <form onSubmit={submitVideo} className="space-y-4">
             <Select value={videoTipo} onChange={(e) => setVideoTipo(e.target.value)}>
-                <option value="pelicula">Película</option>
-                <option value="serie">Serie</option>
+                <option value="pelicula">Película</option><option value="serie">Serie</option>
             </Select>
             <Input type="text" placeholder="Título" value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} required />
             <Input type="url" placeholder="URL del Video" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} required />
             <Input type="url" placeholder="URL del Logo/Thumbnail" value={videoLogo} onChange={(e) => setVideoLogo(e.target.value)} />
             <Textarea placeholder="Descripción" value={videoDescription} onChange={(e) => setVideoDescription(e.target.value)} />
-            <Input type="url" placeholder="URL del Tráiler" value={videoTrailerUrl} onChange={(e) => setVideoTrailerUrl(e.target.value)} />
+            <Input type="url" placeholder="URL del Tráiler (YouTube)" value={videoTrailerUrl} onChange={(e) => setVideoTrailerUrl(e.target.value)} />
             <div>
-              <label htmlFor="videoMainSectionAdmin" className="block text-sm font-medium text-gray-300 mb-1">Sección Principal</label>
+              <label htmlFor="videoMainSectionAdmin" className="block text-sm font-medium text-gray-300 mb-1">Sección Principal (VOD)</label>
               <Select id="videoMainSectionAdmin" value={videoMainSection} onChange={(e) => setVideoMainSection(e.target.value)}>
-                {MAIN_SECTION_OPTIONS.map(opt => (
-                  <option key={opt.key} value={opt.key}>{opt.displayName}</option>
-                ))}
+                {MAIN_SECTION_VOD_OPTIONS.map(opt => (<option key={opt.key} value={opt.key}>{opt.displayName}</option>))}
               </Select>
             </div>
             <div>
-              <label htmlFor="videoGenresAdmin" className="block text-sm font-medium text-gray-300 mb-1">Géneros (separados por coma)</label>
-              <Input id="videoGenresAdmin" type="text" placeholder="Ej: Acción, Comedia, Terror" value={videoGenres} onChange={(e) => setVideoGenres(e.target.value)} />
+              <label htmlFor="videoGenresAdmin" className="block text-sm font-medium text-gray-300 mb-1">Géneros (coma)</label>
+              <Input id="videoGenresAdmin" type="text" placeholder="Ej: Acción, Comedia" value={videoGenres} onChange={(e) => setVideoGenres(e.target.value)} />
             </div>
              <div>
-              <label htmlFor="videoRequiresPlanAdmin" className="block text-sm font-medium text-gray-300 mb-1">Plan Requerido</label>
+              <label htmlFor="videoRequiresPlanAdmin" className="block text-sm font-medium text-gray-300 mb-1">Plan Requerido (VOD)</label>
               <Select id="videoRequiresPlanAdmin" value={videoRequiresPlan} onChange={(e) => setVideoRequiresPlan(e.target.value)}>
-                <option value="basico">Básico</option>
-                <option value="premium">Premium</option>
-                <option value="cinefilo">Cinéfilo</option>
+                 {PLAN_OPTIONS.map(plan => (<option key={plan.key} value={plan.key}>{plan.displayName}</option>))}
               </Select>
             </div>
             <Input type="number" placeholder="Año de Lanzamiento" value={videoReleaseYear} onChange={(e) => setVideoReleaseYear(e.target.value)} />
-            <label className="flex items-center space-x-2 text-gray-300"><input type="checkbox" checked={videoIsFeatured} onChange={(e) => setVideoIsFeatured(e.target.checked)} className="form-checkbox"/><span>Destacado (Home)</span></label>
-            <label className="flex items-center space-x-2 text-gray-300"><input type="checkbox" checked={videoIsActive} onChange={(e) => setVideoIsActive(e.target.checked)} className="form-checkbox"/><span>Activo</span></label>
+            <label className="flex items-center space-x-2 text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={videoIsFeatured} onChange={(e) => setVideoIsFeatured(e.target.checked)} className="form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"/>
+                <span>Destacado (Home)</span></label>
+            <label className="flex items-center space-x-2 text-gray-300 cursor-pointer">
+                <input type="checkbox" checked={videoIsActive} onChange={(e) => setVideoIsActive(e.target.checked)} className="form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"/>
+                <span>Activo</span></label>
             <div className="flex gap-4 pt-2">
-                <Button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">{isSubmitting ? (vodId ? "Actualizando..." : "Agregando...") : (vodId ? "Actualizar VOD" : "Agregar VOD")}</Button>
-                {vodId && <Button type="button" onClick={() => {clearVodForm(); setActiveTab("manage_vod");}} className="bg-gray-600 hover:bg-gray-700">Cancelar</Button>}
+                <Button type="submit" disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
+                    {isSubmitting ? (vodId ? "Actualizando VOD..." : "Agregando VOD...") : (vodId ? "Actualizar VOD" : "Agregar VOD")}
+                </Button>
+                {vodId && <Button type="button" onClick={() => {clearVodForm(); setActiveTab("manage_vod");}} className="bg-gray-600 hover:bg-gray-700">Cancelar Edición</Button>}
             </div>
           </form>
         </section>
