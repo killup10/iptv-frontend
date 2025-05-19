@@ -1,208 +1,166 @@
 // src/pages/LiveTVPage.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { fetchUserChannels, fetchMainChannelSectionsForUser } from '../utils/api.js';
-import MainSectionCard from '../components/MainSectionCard.jsx';
-import Card from '../components/Card.jsx';
-import { ChevronLeftIcon } from '@heroicons/react/24/solid';
-
-const getUniqueValuesFromArray = (items, field) => {
-    if (!items || items.length === 0) return ['Todos'];
-    const values = items.flatMap(item => item[field] || []).filter(Boolean);
-    return ['Todos', ...new Set(values.sort((a,b) => a.localeCompare(b)))];
-};
+import { 
+    fetchUserChannels,          // Para obtener la lista de canales filtrada por categoría/sección
+    fetchChannelFilterSections  // Para obtener los nombres de las categorías para los botones de filtro
+} from '../utils/api.js';      // TU api.js YA EXPORTA ESTAS DOS FUNCIONES
+import Card from '../components/Card.jsx'; // Asumo que Card.jsx está en ../components/
 
 export default function LiveTVPage() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // Para verificar si el usuario está logueado si es necesario
   const navigate = useNavigate();
 
-  const [allUserChannels, setAllUserChannels] = useState([]);
-  const [mainChannelSections, setMainChannelSections] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [allChannels, setAllChannels] = useState([]); // Canales de la categoría seleccionada
+  const [filterCategories, setFilterCategories] = useState(['Todos']); // Ej: ["Todos", "KIDS", "Deportes"]
+  const [selectedCategory, setSelectedCategory] = useState('Todos'); // Categoría actualmente seleccionada
+  
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(false); 
   const [error, setError] = useState(null);
-
-  const [selectedMainSectionKey, setSelectedMainSectionKey] = useState(null);
-  const [categoriesForFilter, setCategoriesForFilter] = useState(['Todos']); // Categorías para el dropdown de filtro DENTRO de una sección
-  const [selectedFilterCategory, setSelectedFilterCategory] = useState('Todos'); // Categoría de filtro seleccionada
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 1. Cargar las categorías/secciones para los botones de filtro al montar
   useEffect(() => {
-    const loadInitialData = async () => {
-      if (!user?.token) {
-        setError("Por favor, inicia sesión para acceder a los canales.");
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
+    const loadFilterCategories = async () => {
+      setIsLoadingCategories(true);
       setError(null);
       try {
-        const [channelsData, sectionsData] = await Promise.all([
-          fetchUserChannels(), 
-          fetchMainChannelSectionsForUser() 
-        ]);
-        setAllUserChannels(channelsData || []);
-        setMainChannelSections(sectionsData || []);
+        console.log("LiveTVPage: Cargando categorías de filtro (fetchChannelFilterSections)...");
+        const categoriesData = await fetchChannelFilterSections(); // Llama a /api/channels/sections
+        setFilterCategories(categoriesData && categoriesData.length > 0 ? categoriesData : ['Todos']);
+        // Establecer la primera categoría (usualmente "Todos") como seleccionada para la carga inicial de canales
+        if (categoriesData && categoriesData.length > 0) {
+          setSelectedCategory(categoriesData[0]); 
+        } else {
+          setSelectedCategory('Todos'); // Fallback
+        }
       } catch (err) {
-        console.error("LiveTVPage: Error cargando datos iniciales:", err);
-        setError(err.message || "No se pudieron cargar los datos de TV en vivo.");
-        setAllUserChannels([]);
-        setMainChannelSections([]);
+        console.error("LiveTVPage: Error cargando categorías de filtro:", err.message);
+        setError(err.message || "No se pudieron cargar las categorías de TV.");
+        setFilterCategories(['Todos']); // Fallback
+        setSelectedCategory('Todos'); // Fallback
       } finally {
-        setIsLoading(false);
+        setIsLoadingCategories(false);
       }
     };
-    loadInitialData();
-  }, [user?.token]);
+    loadFilterCategories();
+  }, []); // Se ejecuta solo una vez al montar
 
+  // 2. Cargar canales cuando selectedCategory cambia (y después de que las categorías iniciales se hayan cargado)
   useEffect(() => {
-    if (!selectedMainSectionKey || !allUserChannels.length) {
-      setCategoriesForFilter(['Todos']);
-      setSelectedFilterCategory('Todos');
-      return;
+    if (!isLoadingCategories && selectedCategory) { // Solo cargar si las categorías están listas y hay una seleccionada
+        // Llamar a la función que realmente carga los canales
+        const loadChannelsForCategory = async (category) => {
+            setIsLoadingChannels(true);
+            setError(null); 
+            // No es necesario limpiar el searchTerm aquí si el usuario está escribiendo
+            try {
+              console.log(`LiveTVPage: Cargando canales para categoría: ${category} (fetchUserChannels)...`);
+              const channelsData = await fetchUserChannels(category); // Llama a /api/channels/list?section=CATEGORY
+              setAllChannels(channelsData || []);
+            } catch (err) {
+              console.error(`LiveTVPage: Error cargando canales para categoría ${category}:`, err.message);
+              setError(err.message || `Error al cargar canales de ${category}.`);
+              setAllChannels([]);
+            } finally {
+              setIsLoadingChannels(false);
+            }
+        };
+        loadChannelsForCategory(selectedCategory);
     }
+  }, [selectedCategory, isLoadingCategories]); // Dependencias clave
 
-    const currentSection = mainChannelSections.find(s => s.key === selectedMainSectionKey);
-    if (!currentSection || !currentSection.categoriesIncluded) {
-      setCategoriesForFilter(['Todos']);
-      setSelectedFilterCategory('Todos');
-      return;
+  // Función para manejar el clic en un botón de categoría
+  const handleCategoryButtonClick = (category) => {
+    if (category !== selectedCategory) { // Solo si es una nueva categoría
+        setSearchTerm(''); // Limpiar búsqueda al cambiar de categoría
+        setSelectedCategory(category); // Esto disparará el useEffect de arriba para cargar canales
     }
-    
-    const channelsInThisMainSection = allUserChannels.filter(channel => 
-      currentSection.categoriesIncluded.includes(channel.category)
-    );
-    
-    setCategoriesForFilter(getUniqueValuesFromArray(channelsInThisMainSection, 'category'));
-    setSelectedFilterCategory('Todos');
-    setSearchTerm('');
-
-  }, [selectedMainSectionKey, allUserChannels, mainChannelSections]);
-
+  };
+  
+  // Filtrar canales por término de búsqueda (esto es solo frontend sobre 'allChannels')
   const displayedChannels = useMemo(() => {
-    if (!selectedMainSectionKey && mainChannelSections.length > 0 && !isLoading) return []; 
-    
-    let filtered = allUserChannels;
-    const currentSection = mainChannelSections.find(s => s.key === selectedMainSectionKey);
-
-    if (currentSection && currentSection.categoriesIncluded) {
-        filtered = filtered.filter(channel => 
-            currentSection.categoriesIncluded.includes(channel.category)
-        );
-    } else if (selectedMainSectionKey === "ALL_CHANNELS_VIEW") { // Ejemplo de clave para "ver todos"
-        // No aplicar filtro de sección principal si es "ver todos"
-    } else if (selectedMainSectionKey) { // Si se seleccionó una sección no encontrada o sin categoriesIncluded
-        // return []; // O mostrar mensaje de sección no válida
-    }
-
-
-    if (selectedFilterCategory !== 'Todos') {
-      filtered = filtered.filter(ch => ch.category === selectedFilterCategory);
-    }
-
-    if (searchTerm) {
-      filtered = filtered.filter(ch => 
-        ch.name && ch.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    return filtered;
-  }, [allUserChannels, mainChannelSections, selectedMainSectionKey, selectedFilterCategory, searchTerm, isLoading]);
+    if (!allChannels) return [];
+    if (!searchTerm) return allChannels;
+    return allChannels.filter(ch =>
+      ch.name && ch.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [allChannels, searchTerm]);
 
   const handleChannelClick = (channel) => {
     const channelId = channel.id || channel._id;
-    if (!channelId) return; 
-    navigate(`/watch/channel/${channelId}`);
+    if (!channelId) {
+      console.error("handleChannelClick: channelId no encontrado", channel);
+      return;
+    }
+    navigate(`/watch/channel/${channelId}`); // El backend /api/channels/id/:channelId verificará el plan
   };
+
+  // --- RENDERIZADO ---
+  const showInitialLoading = isLoadingCategories && filterCategories.length <= 1;
+  const showChannelLoading = isLoadingChannels;
+  const showGeneralError = error && !showChannelLoading && displayedChannels.length === 0 && filterCategories.length <=1;
+
+  if (showInitialLoading) {
+      return <div className="flex justify-center items-center min-h-[calc(100vh-128px)]"><div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div><p className="ml-4 text-xl text-white">Cargando Interfaz...</p></div>;
+  }
   
-  const handleSelectMainSection = (sectionKey) => {
-    setSelectedMainSectionKey(sectionKey);
-    setSelectedFilterCategory('Todos'); 
-  };
-
-  if (isLoading) return <div className="flex justify-center items-center min-h-[calc(100vh-128px)]"><div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
-  if (error) return <p className="text-center text-red-400 p-6 text-lg bg-gray-800 rounded-md mx-auto max-w-md">{error}</p>;
-  if (!user) return <p className="text-center text-xl text-gray-400 mt-20">Debes <a href="/login" className="text-red-500 hover:underline">iniciar sesión</a> para ver este contenido.</p>;
-
-  if (!selectedMainSectionKey) {
+  if (showGeneralError) { 
     return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-8 text-center sm:text-left">
-          Explorar TV en Vivo
-        </h1>
-        {mainChannelSections.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">
-            {mainChannelSections.map(section => (
-              <MainSectionCard 
-                key={section.key} 
-                section={section} 
-                onClick={handleSelectMainSection}
-                userPlan={user.plan || 'gplay'}
-                // Para miniaturas, MainSectionCard debe poder usar section.thumbnailSample
-                // o podrías pasarle una lista de canales de esa sección para que rote logos
-                moviesInSection={allUserChannels.filter(c => section.categoriesIncluded?.includes(c.category)).slice(0, 10)}
-              />
-            ))}
-            {/* Opcional: Botón para ver todos los canales sin filtrar por sección principal */}
-            {/* <div 
-              onClick={() => handleSelectMainSection("ALL_CHANNELS_VIEW")}
-              className="bg-gray-700 p-6 rounded-xl text-center text-white font-semibold hover:bg-gray-600 cursor-pointer transition"
-            >
-              Ver Todos los Canales ({allUserChannels.length})
-            </div> */}
-          </div>
-        ) : (
-          <p className="text-center text-gray-500 mt-10 text-lg">No hay secciones de TV en vivo disponibles o no se pudieron cargar.</p>
-        )}
-      </div>
+        <div className="container mx-auto px-4 py-8 text-center">
+             <h1 className="text-3xl font-bold text-white mb-6">TV en Vivo</h1>
+            <p className="text-red-400 p-4 bg-gray-800 rounded-md">{error}</p>
+        </div>
     );
   }
 
-  const currentMainSectionDetails = mainChannelSections.find(s => s.key === selectedMainSectionKey) || 
-                                   (selectedMainSectionKey === "ALL_CHANNELS_VIEW" ? { displayName: "Todos los Canales" } : null);
+  // No necesitas verificar !user aquí si la ruta /tv está protegida por PrivateRoute que ya lo hace
+  // if (!user) return <p>...</p>; 
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-        <div className="flex items-center">
-          <button 
-            onClick={() => { setSelectedMainSectionKey(null); setSearchTerm(''); }} 
-            className="mr-3 text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 transition-colors"
-            title="Volver a Secciones"
-          >
-            <ChevronLeftIcon className="w-6 h-6 sm:w-7 sm:w-7" />
-          </button>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
-            {currentMainSectionDetails?.displayName || "Canales"}
-          </h1>
-        </div>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 text-white">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center md:text-left">
+          TV en Vivo
+        </h1>
         <input
-            type="text"
-            placeholder={`Buscar en ${selectedFilterCategory === 'Todos' ? (currentMainSectionDetails?.displayName || "la sección") : selectedFilterCategory}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full md:w-1/3 lg:w-1/4 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-shadow"
+          type="text"
+          placeholder="Buscar canal..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full md:w-2/5 lg:w-1/3 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg placeholder-gray-400 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-shadow"
         />
       </div>
-      
-      {categoriesForFilter.length > 1 && selectedMainSectionKey !== "ALL_CHANNELS_VIEW" && (
-        <div className="flex flex-wrap gap-2 mb-8 pb-4 border-b border-gray-700">
-          {categoriesForFilter.map(category => (
+
+      {!isLoadingCategories && filterCategories.length > 0 && (
+        <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-8 pb-4 border-b border-gray-700">
+          {filterCategories.map(categoryName => (
             <button
-              key={category}
-              onClick={() => setSelectedFilterCategory(category)}
-              className={`px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors duration-150
-                          ${selectedFilterCategory === category 
-                              ? 'bg-red-600 text-white shadow-lg' 
-                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'}`}
+              key={categoryName}
+              onClick={() => handleCategoryButtonClick(categoryName)} // Usa la nueva función de manejo
+              disabled={isLoadingChannels && selectedCategory === categoryName}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 ease-in-out
+                          ${selectedCategory === categoryName
+                              ? 'bg-red-600 text-white shadow-lg ring-2 ring-red-400'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500'}
+                          ${(isLoadingChannels && selectedCategory === categoryName) ? 'opacity-50 cursor-wait' : ''}`}
             >
-              {category}
+              {categoryName}
             </button>
           ))}
         </div>
       )}
+      
+      {showChannelLoading && <div className="flex justify-center items-center mt-10"><div className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div><p className="ml-3 text-lg">Cargando canales para {selectedCategory}...</p></div>}
+      
+      {error && !showChannelLoading && ( // Muestra error si no se están cargando canales activamente
+          <p className="text-center text-red-400 my-6 p-4 bg-red-900/30 rounded-md">{error}</p>
+      )}
 
-      {displayedChannels.length > 0 ? (
-         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+      {!showChannelLoading && !error && displayedChannels.length > 0 && (
+        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-3 gap-y-5 sm:gap-x-4 sm:gap-y-6">
           {displayedChannels.map(channel => (
             <Card
               key={channel.id || channel._id}
@@ -210,20 +168,23 @@ export default function LiveTVPage() {
                   id: channel.id || channel._id,
                   name: channel.name,
                   title: channel.name,
-                  thumbnail: channel.thumbnail || channel.logo || '/img/placeholder-thumbnail.png',
-                  category: channel.category,
+                  thumbnail: channel.thumbnail || '/img/placeholder-thumbnail.png', // Asegúrate que esta imagen exista en public/img
               }}
               onClick={() => handleChannelClick(channel)}
               itemType="channel"
             />
           ))}
         </div>
-      ) : (
+      )}
+
+      {!showChannelLoading && !error && displayedChannels.length === 0 && (
         <p className="text-center text-gray-400 mt-12 text-lg">
-          {searchTerm && `No se encontraron canales para "${searchTerm}".`}
-          {!searchTerm && (selectedFilterCategory !== 'Todos') && `No se encontraron canales para la categoría "${selectedFilterCategory}".`}
-          {!searchTerm && (selectedFilterCategory === 'Todos') && `No hay canales en ${currentMainSectionDetails?.displayName || 'la sección actual'}.`}
+          {searchTerm ? `No se encontraron canales para "${searchTerm}" en la categoría "${selectedCategory}".` :
+           (filterCategories.length > 0 ? `No hay canales disponibles en la categoría "${selectedCategory}".` : `No hay canales disponibles.`)}
         </p>
+      )}
+      {!isLoadingCategories && filterCategories.length <= 1 && !error && displayedChannels.length === 0 && ( 
+           <p className="text-center text-gray-500 mt-10 text-lg">No hay categorías de TV en vivo para mostrar.</p>
       )}
     </div>
   );
