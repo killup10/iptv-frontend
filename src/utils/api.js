@@ -255,7 +255,8 @@ export async function fetchAdminVideos() {
 }
 
 export async function createAdminVideo(videoData) {
-  const relativePath = "/api/videos";
+  // CORRECCIÓN: Apuntar al endpoint correcto definido en videos.routes.js del backend
+  const relativePath = "/api/videos/upload-link"; 
   console.log(`API (createAdminVideo - axios): POST ${relativePath} con data:`, videoData);
   try {
     const response = await axiosInstance.post(relativePath, videoData);
