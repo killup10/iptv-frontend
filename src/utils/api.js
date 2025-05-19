@@ -16,9 +16,9 @@ export async function fetchUserChannels(sectionName = "Todos") {
   console.log(`API (fetchUserChannels - axios): GET ${relativePath} con params:`, params);
   try {
     const response = await axiosInstance.get(relativePath, { params });
-    // response.data ya contiene el JSON parseado.
-    // El mapeo que tenías en el frontend para esta función (si lo había) se puede mantener.
-    return response.data || []; // Devuelve array vacío si no hay datos
+    // El mapeo que tenías para transformar la data de canales se puede mantener aquí si es necesario
+    // o hacerlo en el componente que consume esta función. Por simplicidad, devolvemos la data cruda.
+    return response.data || [];
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar canales.";
     console.error(`API Error (fetchUserChannels - axios): ${errorMsg}`, error.response?.data);
@@ -57,7 +57,7 @@ export async function fetchChannelForPlayback(channelId) {
 /* =================== VOD - USUARIO =================== */
 
 export async function fetchUserMovies() {
-  const relativePath = "/api/videos";
+  const relativePath = "/api/videos"; // Esta ruta en tu backend usa verifyToken
   const params = { tipo: "pelicula" };
   console.log(`API (fetchUserMovies - axios): GET ${relativePath} con params:`, params);
   try {
@@ -71,7 +71,7 @@ export async function fetchUserMovies() {
 }
 
 export async function fetchUserSeries() {
-  const relativePath = "/api/videos";
+  const relativePath = "/api/videos"; // Esta ruta en tu backend usa verifyToken
   const params = { tipo: "serie" };
   console.log(`API (fetchUserSeries - axios): GET ${relativePath} con params:`, params);
   try {
@@ -85,10 +85,8 @@ export async function fetchUserSeries() {
 }
 
 export async function fetchMainMovieSections() {
-  const relativePath = "/api/videos/sections"; // Asumiendo esta es la ruta correcta
+  const relativePath = "/api/videos/main-sections"; // Esta ruta en tu backend usa verifyToken
   console.log(`API (fetchMainMovieSections - axios): GET ${relativePath}`);
-  // Si esta ruta requiere autenticación, axiosInstance añadirá el token.
-  // Si es pública, simplemente no se añadirá.
   try {
     const response = await axiosInstance.get(relativePath);
     return response.data || [];
@@ -99,19 +97,23 @@ export async function fetchMainMovieSections() {
   }
 }
 
-/* =================== DESTACADOS - HOME =================== */
+/* =================== DESTACADOS - HOME (RUTAS PÚBLICAS CORREGIDAS) =================== */
 
 export async function fetchFeaturedChannels() {
-  const relativePath = "/api/channels/featured"; // Usando la ruta de tu último api.js
-  console.log(`API (fetchFeaturedChannels - axios): GET ${relativePath}`);
+  // Llama a la ruta pública /api/channels/list con el filtro ?featured=true
+  // Tu backend en channels.routes.js tiene router.get("/list", getPublicChannels);
+  // y getPublicChannels en channel.controller.js debería manejar este query param.
+  const relativePath = "/api/channels/list";
+  const params = { featured: "true" }; // El backend debe interpretar este 'true'
+  console.log(`API (fetchFeaturedChannels - axios): GET ${relativePath} con params:`, params);
   try {
-    const response = await axiosInstance.get(relativePath);
+    const response = await axiosInstance.get(relativePath, { params });
     const data = response.data;
     if (!Array.isArray(data)) {
         console.warn(`API (fetchFeaturedChannels - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data;
+    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar canales destacados.";
     console.error(`API Error (fetchFeaturedChannels - axios): ${errorMsg}`, error.response?.data);
@@ -120,17 +122,18 @@ export async function fetchFeaturedChannels() {
 }
 
 export async function fetchFeaturedMovies() {
-  const relativePath = "/api/videos/featured"; // Usando la ruta de tu último api.js
-  const params = { type: "pelicula" };
-  console.log(`API (fetchFeaturedMovies - axios): GET ${relativePath} con params:`, params);
+  // Llama a la ruta pública /api/videos/public/featured-movies
+  // Tu backend en videos.routes.js tiene esta ruta definida sin verifyToken.
+  const relativePath = "/api/videos/public/featured-movies";
+  console.log(`API (fetchFeaturedMovies - axios): GET ${relativePath}`);
   try {
-    const response = await axiosInstance.get(relativePath, { params });
+    const response = await axiosInstance.get(relativePath);
     const data = response.data;
     if (!Array.isArray(data)) {
         console.warn(`API (fetchFeaturedMovies - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data;
+    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar películas destacadas.";
     console.error(`API Error (fetchFeaturedMovies - axios): ${errorMsg}`, error.response?.data);
@@ -139,17 +142,18 @@ export async function fetchFeaturedMovies() {
 }
 
 export async function fetchFeaturedSeries() {
-  const relativePath = "/api/videos/featured"; // Usando la ruta de tu último api.js
-  const params = { type: "serie" };
-  console.log(`API (fetchFeaturedSeries - axios): GET ${relativePath} con params:`, params);
+  // Llama a la ruta pública /api/videos/public/featured-series
+  // Tu backend en videos.routes.js tiene esta ruta definida sin verifyToken.
+  const relativePath = "/api/videos/public/featured-series";
+  console.log(`API (fetchFeaturedSeries - axios): GET ${relativePath}`);
   try {
-    const response = await axiosInstance.get(relativePath, { params });
+    const response = await axiosInstance.get(relativePath);
     const data = response.data;
     if (!Array.isArray(data)) {
         console.warn(`API (fetchFeaturedSeries - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data;
+    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar series destacadas.";
     console.error(`API Error (fetchFeaturedSeries - axios): ${errorMsg}`, error.response?.data);
@@ -163,8 +167,6 @@ export async function fetchFeaturedSeries() {
 // que ya han sido configuradas para usar axiosInstance.
 
 /* =================== ADMIN - CANALES =================== */
-// Para las funciones de Admin, axiosInstance añadirá el token automáticamente.
-// El backend es quien debe verificar si el token es válido y si el usuario es Admin.
 
 export async function fetchAdminChannels() {
   const relativePath = "/api/channels/admin/list";
@@ -181,9 +183,9 @@ export async function fetchAdminChannels() {
 
 export async function createAdminChannel(channelData) {
   const relativePath = "/api/channels/admin"; // o /api/channels/admin/create si ese es tu endpoint exacto
-  console.log(`API (createAdminChannel - axios): POST ${relativePath}`);
+  console.log(`API (createAdminChannel - axios): POST ${relativePath} con data:`, channelData);
   try {
-    const response = await axiosInstance.post(relativePath, channelData); // axios se encarga de JSON.stringify
+    const response = await axiosInstance.post(relativePath, channelData);
     return response.data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Admin: Error al crear canal.";
@@ -194,7 +196,7 @@ export async function createAdminChannel(channelData) {
 
 export async function updateAdminChannel(channelId, channelData) {
   const relativePath = `/api/channels/admin/${channelId}`;
-  console.log(`API (updateAdminChannel - axios): PUT ${relativePath}`);
+  console.log(`API (updateAdminChannel - axios): PUT ${relativePath} con data:`, channelData);
   try {
     const response = await axiosInstance.put(relativePath, channelData);
     return response.data;
@@ -210,8 +212,6 @@ export async function deleteAdminChannel(channelId) {
   console.log(`API (deleteAdminChannel - axios): DELETE ${relativePath}`);
   try {
     const response = await axiosInstance.delete(relativePath);
-    // Para DELETE, a veces el backend devuelve 204 No Content (sin cuerpo JSON)
-    // o un JSON con { message: "Eliminado" }.
     if (response.status === 204) return { message: "Canal eliminado correctamente." };
     return response.data;
   } catch (error) {
@@ -222,8 +222,7 @@ export async function deleteAdminChannel(channelId) {
 }
 
 export async function processM3UForAdmin(formData) {
-  // Para FormData, axiosInstance también funciona. No se debe establecer Content-Type manualmente.
-  const relativePath = "/api/channels/admin/process-m3u"; // Endpoint de ejemplo
+  const relativePath = "/api/channels/admin/process-m3u";
   console.log(`API (processM3UForAdmin - axios): POST ${relativePath}`);
   try {
     const response = await axiosInstance.post(relativePath, formData, {
@@ -256,8 +255,8 @@ export async function fetchAdminVideos() {
 }
 
 export async function createAdminVideo(videoData) {
-  const relativePath = "/api/videos"; // Usando el endpoint que tenías en tu último api.js
-  console.log(`API (createAdminVideo - axios): POST ${relativePath}`);
+  const relativePath = "/api/videos";
+  console.log(`API (createAdminVideo - axios): POST ${relativePath} con data:`, videoData);
   try {
     const response = await axiosInstance.post(relativePath, videoData);
     return response.data;
@@ -270,7 +269,7 @@ export async function createAdminVideo(videoData) {
 
 export async function updateAdminVideo(videoId, videoData) {
   const relativePath = `/api/videos/${videoId}`;
-  console.log(`API (updateAdminVideo - axios): PUT ${relativePath}`);
+  console.log(`API (updateAdminVideo - axios): PUT ${relativePath} con data:`, videoData);
   try {
     const response = await axiosInstance.put(relativePath, videoData);
     return response.data;
