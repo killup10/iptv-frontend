@@ -3,30 +3,34 @@ import React, { useEffect } from 'react';
 import VideoPlayer from './VideoPlayer.jsx'; // Ajusta la ruta si es diferente
 import { XMarkIcon } from '@heroicons/react/24/solid';
 
-// Helper para extraer el ID de YouTube de varias URL
+// Helper para extraer el ID de YouTube de varias URL de video (no playlists)
 const getYouTubeId = (url) => {
     if (!url) return null;
-    // Expresión regular mejorada para varios formatos de URL de YouTube
+    // Expresión regular para varios formatos de URL de video de YouTube
+    // Coincide con: youtu.be/, /watch?v=, /embed/, /v/, /u/N/
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    const id = (match && match[2] && match[2].length === 11) ? match[2] : null;
-    // console.log(`TrailerModal: getYouTubeId para '${url}' -> '${id}'`);
-    return id;
+    const videoId = (match && match[2] && match[2].length === 11) ? match[2] : null;
+    // console.log(`TrailerModal: getYouTubeId para '${url}' -> ID: '${videoId}'`);
+    return videoId;
 };
 
 const TrailerModal = ({ trailerUrl, onClose }) => {
   useEffect(() => {
+    // Cierra el modal si se presiona la tecla Escape
     const handleEsc = (event) => {
       if (event.key === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleEsc);
+    // Limpieza del event listener al desmontar
     return () => {
       window.removeEventListener('keydown', handleEsc);
     };
   }, [onClose]);
 
+  // Evita que el clic dentro del contenido del modal cierre el modal
   const handleContentClick = (e) => {
     e.stopPropagation();
   };
@@ -37,17 +41,21 @@ const TrailerModal = ({ trailerUrl, onClose }) => {
   }
 
   const youtubeId = getYouTubeId(trailerUrl);
-  // Construir URL de embed de YouTube con autoplay y sin videos relacionados
-  const youtubeEmbedUrl = youtubeId ? `https://www.youtube.com/embed/VIDEO_ID${youtubeId}?autoplay=1&rel=0&modestbranding=1` : null;
+  // Construir URL de embed de YouTube con autoplay, sin videos relacionados y permitiendo fullscreen
+  const youtubeEmbedUrl = youtubeId ? `https://www.youtube.com/watch?v=9pyD9dZI3XA{youtubeId}?autoplay=1&rel=0&modestbranding=1&fs=1` : null;
+
+  // console.log("TrailerModal: trailerUrl original:", trailerUrl);
+  // console.log("TrailerModal: youtubeId extraído:", youtubeId);
+  // console.log("TrailerModal: youtubeEmbedUrl generado:", youtubeEmbedUrl);
 
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-85 flex items-center justify-center z-[100] p-4"
-      onClick={onClose} 
+      onClick={onClose} // Cierra el modal al hacer clic en el fondo
     >
       <div 
         className="bg-black p-3 sm:p-4 rounded-xl shadow-2xl w-full max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl relative border border-gray-700"
-        onClick={handleContentClick}
+        onClick={handleContentClick} // Evita que el clic aquí cierre el modal
       >
         <button 
           onClick={onClose}
@@ -66,12 +74,12 @@ const TrailerModal = ({ trailerUrl, onClose }) => {
               title="YouTube video player"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              className="block" // Asegurar que el iframe ocupe el espacio
+              allowFullScreen // Habilita el botón de pantalla completa en el reproductor de YouTube
+              className="block" // Asegura que el iframe ocupe el espacio
             ></iframe>
           ) : (
-            // Asumiendo que tu VideoPlayer puede manejar otras URLs de tráiler (MP4, M3U8)
+            // Si no es una URL de YouTube, o no se pudo extraer el ID,
+            // intenta reproducir con VideoPlayer (asumiendo que puede manejar otras URLs de tráiler)
             <VideoPlayer url={trailerUrl} /> 
           )}
         </div>
