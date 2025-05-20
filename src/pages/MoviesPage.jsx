@@ -1,42 +1,41 @@
 // src/pages/MoviesPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
-import { fetchUserMovies, fetchMainMovieSections } from '../utils/api.js'; // Asumiendo que creaste fetchMainMovieSections
-import Card from '../components/Card.jsx';
-import MainSectionCard from '../components/MainSectionCard.jsx';
-import { ChevronLeftIcon } from '@heroicons/react/24/solid'; // Para el botón de volver
+import { useAuth } from '@/context/AuthContext.jsx';
+import { fetchUserMovies, fetchMainMovieSections } from '@/utils/api.js';
+import Card from '@/components/Card.jsx';
+import MainSectionCard from '@/components/MainSectionCard.jsx';
+import { ChevronLeftIcon } from '@heroicons/react/24/solid';
 
-// Helper para extraer valores únicos de un array de objetos
 const getUniqueValuesFromArray = (items, field) => {
     if (!items || items.length === 0) return ['Todas'];
-    // Maneja tanto campos que son arrays (como genres) como campos que son strings directos
     const values = items.flatMap(item => {
         const fieldValue = item[field];
         if (Array.isArray(fieldValue)) {
             return fieldValue;
         }
         return fieldValue ? [fieldValue] : [];
-    }).filter(Boolean); // Filtra null, undefined, y strings vacíos
+    }).filter(Boolean);
     return ['Todas', ...new Set(values.sort((a,b) => a.localeCompare(b)))];
 };
 
+const shouldShowSpecialsSection = () => {
+  // Cambia esto a 'false' si quieres ocultar la sección "ESPECIALES"
+  return true; 
+};
 
 export default function MoviesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
   const [allUserMovies, setAllUserMovies] = useState([]);
   const [mainSections, setMainSections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [selectedMainSectionKey, setSelectedMainSectionKey] = useState(null);
   const [genresForSelectedSection, setGenresForSelectedSection] = useState(['Todas']);
   const [selectedGenre, setSelectedGenre] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Cargar datos iniciales (secciones y todas las películas del usuario)
   useEffect(() => {
     const loadInitialData = async () => {
       if (!user?.token) {
@@ -47,20 +46,35 @@ export default function MoviesPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const [moviesData, sectionsData] = await Promise.all([
-          fetchUserMovies(), // Ya debería filtrar por plan en el backend
-          fetchMainMovieSections() // Llama a tu nueva función API
+        const [moviesData, sectionsDataFromAPI] = await Promise.all([
+          fetchUserMovies(),
+          fetchMainMovieSections()
         ]);
+        
+        console.log("MoviesPage - Películas Cargadas (allUserMovies):", moviesData); // VERIFICA ESTO
+        console.log("MoviesPage - Secciones Cargadas (mainSections API):", sectionsDataFromAPI);
         setAllUserMovies(moviesData || []);
-        setMainSections(sectionsData || []);
 
-        // Si solo hay una sección y es "POR_GENERO", o si no hay secciones, seleccionar POR_GENERO por defecto si existe
-        if (sectionsData?.length === 1 && sectionsData[0].key === "POR_GENERO") {
-            setSelectedMainSectionKey("POR_GENERO");
-        } else if (!sectionsData || sectionsData.length === 0 && (moviesData && moviesData.length > 0)) {
-            // Si no hay secciones definidas pero hay películas, podríamos ir a una vista "Todas" o "Por Género" por defecto
-            // Por ahora, dejaremos que se muestre el mensaje de no secciones o que el usuario elija
+        let filteredSections = sectionsDataFromAPI || [];
+        if (!shouldShowSpecialsSection()) {
+          filteredSections = filteredSections.filter(section => section.key !== "ESPECIALES");
         }
+        setMainSections(filteredSections);
+
+        // Si después de filtrar solo queda "POR_GENERO" o no hay secciones pero sí películas,
+        // podríamos auto-seleccionar "POR_GENERO".
+        if (filteredSections?.length === 1 && filteredSections[0].key === "POR_GENERO") {
+            setSelectedMainSectionKey("POR_GENERO");
+        } else if (filteredSections?.length === 0 && (moviesData && moviesData.length > 0)) {
+            // Si no hay secciones definidas pero sí películas, podrías tener una sección "POR_GENERO" por defecto.
+            // Opcional: añadir una sección "POR_GENERO" si no existe y hay películas.
+            // const hasPorGenero = sectionsDataFromAPI?.some(s => s.key === "POR_GENERO");
+            // if (!hasPorGenero) {
+            //    setMainSections([{ key: "POR_GENERO", displayName: "POR GÉNEROS", order: -1 }, ...filteredSections]);
+            // }
+            // setSelectedMainSectionKey("POR_GENERO");
+        }
+
 
       } catch (err) {
         console.error("MoviesPage: Error cargando datos iniciales:", err);
@@ -72,42 +86,62 @@ export default function MoviesPage() {
     loadInitialData();
   }, [user?.token]);
 
-  // Actualizar géneros cuando cambia la sección principal o las películas cargadas
   useEffect(() => {
     if (!selectedMainSectionKey || !allUserMovies.length) {
       setGenresForSelectedSection(['Todas']);
       setSelectedGenre('Todas');
       return;
     }
-
     let moviesForGenreExtraction = [];
     if (selectedMainSectionKey === "POR_GENERO") {
-      moviesForGenreExtraction = allUserMovies; // Usar todas las películas para extraer géneros
+      // Para "POR_GENERO", extrae géneros de películas que tengan mainSection="POR_GENERO" o no tengan mainSection
+      moviesForGenreExtraction = allUserMovies.filter(m => m.mainSection === "POR_GENERO" || !m.mainSection);
     } else {
       moviesForGenreExtraction = allUserMovies.filter(m => m.mainSection === selectedMainSectionKey);
     }
-    
     setGenresForSelectedSection(getUniqueValuesFromArray(moviesForGenreExtraction, 'genres'));
-    setSelectedGenre('Todas'); // Resetear filtro de género
-    setSearchTerm(''); // Limpiar búsqueda al cambiar de sección/género
-
+    setSelectedGenre('Todas');
+    setSearchTerm('');
   }, [selectedMainSectionKey, allUserMovies]);
 
-  // Películas a mostrar en la cuadrícula
   const displayedMovies = useMemo(() => {
-    if (!selectedMainSectionKey && mainSections.length > 0) return []; // No mostrar películas si estamos en la vista de secciones
+    // Si no hay sección principal seleccionada Y hay secciones para mostrar (y no es solo POR_GENERO implícito),
+    // no mostramos películas aún (estamos en la vista de selección de secciones).
+    if (!selectedMainSectionKey && mainSections.length > 0 ) {
+        // Si la única sección es POR_GENERO y está implícita (no seleccionada por el usuario aún),
+        // podríamos querer mostrar las películas de POR_GENERO.
+        // Pero si hay varias secciones, esperamos que el usuario elija una.
+        if (mainSections.length === 1 && mainSections[0].key === "POR_GENERO" && !selectedMainSectionKey) {
+            // No hacer nada aquí, dejar que el filtro de abajo se aplique si selectedMainSectionKey se auto-establece
+        } else if (mainSections.some(s => s.key !== "POR_GENERO")) { // Si hay otras secciones además de un posible "POR_GENERO"
+             return [];
+        }
+    }
     
     let filtered = allUserMovies;
 
-    if (selectedMainSectionKey && selectedMainSectionKey !== "POR_GENERO") {
-      filtered = filtered.filter(m => m.mainSection === selectedMainSectionKey);
+    // Aplicar filtro de sección principal SIEMPRE que haya una seleccionada
+    if (selectedMainSectionKey) {
+      if (selectedMainSectionKey === "POR_GENERO") {
+        // Para "POR_GENERO", mostrar las que tienen mainSection="POR_GENERO" o no tienen mainSection (consideradas generales)
+        filtered = filtered.filter(m => m.mainSection === "POR_GENERO" || !m.mainSection);
+      } else {
+        // Para cualquier otra sección específica, solo mostrar películas de esa sección.
+        filtered = filtered.filter(m => m.mainSection === selectedMainSectionKey);
+      }
+    } else if (mainSections.length === 0 && allUserMovies.length > 0) {
+        // Si no hay secciones definidas en absoluto, pero hay películas, mostrarlas todas (se filtrarán por género y búsqueda)
+        // Esto es como un fallback a "POR_GENERO" si no hay `mainSections`.
+        // No se aplica filtro de `mainSection` aquí.
+    } else if (mainSections.length > 0) {
+        // Si hay secciones pero ninguna seleccionada, no mostrar nada (ya cubierto arriba)
+        return [];
     }
-
+    
     if (selectedGenre !== 'Todas') {
       filtered = filtered.filter(m => 
         (Array.isArray(m.genres) && m.genres.map(g => g.toLowerCase()).includes(selectedGenre.toLowerCase())) || 
-        (typeof m.genres === 'string' && m.genres.toLowerCase() === selectedGenre.toLowerCase()) || // Si genres es un solo string
-        (selectedMainSectionKey === "POR_GENERO" && m.genres && ( (Array.isArray(m.genres) && m.genres.includes(selectedGenre) ) || m.genres === selectedGenre ) ) // Caso especial para POR_GENERO
+        (typeof m.genres === 'string' && m.genres.toLowerCase() === selectedGenre.toLowerCase())
       );
     }
 
@@ -130,12 +164,10 @@ export default function MoviesPage() {
   };
   
   const handleSelectMainSection = (sectionKey) => {
-    console.log("Sección principal seleccionada:", sectionKey);
     setSelectedMainSectionKey(sectionKey);
     setSelectedGenre('Todas'); 
   };
 
-  // --- Renderizado ---
   if (isLoading) return <div className="flex justify-center items-center min-h-[calc(100vh-128px)]"><div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-600"></div></div>;
   if (error) return <p className="text-center text-red-400 p-6 text-lg bg-gray-800 rounded-md mx-auto max-w-md">{error}</p>;
   if (!user) return <p className="text-center text-xl text-gray-400 mt-20">Debes <a href="/login" className="text-red-500 hover:underline">iniciar sesión</a> para ver este contenido.</p>;
@@ -154,13 +186,13 @@ export default function MoviesPage() {
                 key={section.key} 
                 section={section} 
                 onClick={handleSelectMainSection}
-                userPlan={user.plan || 'basico'}
-                moviesInSection={allUserMovies.filter(m => m.mainSection === section.key).slice(0, 15)} // Pasa algunas películas para la miniatura cambiante
+                userPlan={user.plan || 'gplay'}
+                moviesInSection={allUserMovies.filter(m => m.mainSection === section.key || (section.key === "POR_GENERO" && (!m.mainSection || m.mainSection === "POR_GENERO"))).slice(0, 15)}
               />
             ))}
           </div>
         ) : (
-          <p className="text-center text-gray-500 mt-10 text-lg">No hay secciones de películas disponibles en este momento.</p>
+          <p className="text-center text-gray-500 mt-10 text-lg">No hay secciones de películas disponibles en este momento. O todas las películas se muestran bajo "POR GÉNEROS" si es la única opción.</p>
         )}
       </div>
     );
@@ -174,10 +206,7 @@ export default function MoviesPage() {
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
         <div className="flex items-center">
           <button 
-            onClick={() => {
-                setSelectedMainSectionKey(null); 
-                setSearchTerm(''); // Limpiar búsqueda al volver
-            }} 
+            onClick={() => { setSelectedMainSectionKey(null); setSearchTerm(''); }} 
             className="mr-3 text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 transition-colors"
             title="Volver a Secciones"
           >
@@ -196,8 +225,7 @@ export default function MoviesPage() {
         />
       </div>
       
-      {/* Filtros de Género/Subcategoría */}
-      {genresForSelectedSection.length > 1 && ( // Solo mostrar si hay más que "Todas"
+      {genresForSelectedSection.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-8 pb-4 border-b border-gray-700">
           {genresForSelectedSection.map(genre => (
             <button
@@ -214,7 +242,6 @@ export default function MoviesPage() {
         </div>
       )}
 
-      {/* Cuadrícula de Películas */}
       {displayedMovies.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-8 sm:gap-x-5 sm:gap-y-10">
           {displayedMovies.map(movie => (
@@ -222,7 +249,13 @@ export default function MoviesPage() {
               key={movie.id || movie._id}
               item={movie}
               onClick={() => handleMovieClick(movie)}
-              itemType="movie" // Siempre es 'movie' en esta página
+              itemType="movie"
+              onPlayTrailer={(trailerUrl) => { 
+                  // Aquí deberías tener la lógica para abrir tu TrailerModal
+                  // setCurrentTrailerUrl(trailerUrl); // Necesitarías este estado y setShowTrailerModal(true);
+                  // Por ahora, lo dejo como placeholder
+                  console.log("Intentando reproducir tráiler:", trailerUrl);
+               }}
             />
           ))}
         </div>

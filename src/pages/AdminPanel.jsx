@@ -102,41 +102,36 @@ const MAIN_SECTION_VOD_OPTIONS = [
 
 // Lista completa y actualizada de tus planes
 const ALL_AVAILABLE_PLANS = [
-  { key: "gplay", displayName: "GPlay" },      // Asumiendo 'gplay' es tu plan básico
+  { key: "gplay", displayName: "GPlay" },
   { key: "estandar", displayName: "Estándar" },
   { key: "cinefilo", displayName: "Cinéfilo" },
   { key: "sports", displayName: "Sports" },
   { key: "premium", displayName: "Premium" },
-  // { key: "free_preview", displayName: "Vista Previa Gratuita" }, // Si lo tienes
 ];
 
 export default function AdminPanel() {
   const { user } = useAuth();
-
   const [m3uFile, setM3uFile] = useState(null);
   const [m3uFileNameDisplay, setM3uFileNameDisplay] = useState("");
-
   const [channelId, setChannelId] = useState(null);
   const [channelForm, setChannelForm] = useState({
     name: "", url: "", logo: "", description: "", section: "General",
     active: true, isFeatured: false, requiresPlan: [], isPubliclyVisible: true,
   });
-
   const [vodId, setVodId] = useState(null);
   const [vodForm, setVodForm] = useState({
     title: "", url: "", logo: "", description: "", trailerUrl: "",
     releaseYear: new Date().getFullYear().toString(), isFeatured: false, active: true,
     tipo: "pelicula", mainSection: MAIN_SECTION_VOD_OPTIONS[0]?.key || "",
-    genres: "", requiresPlan: [], // Inicializa como array vacío para multiplan
+    genres: "", requiresPlan: [],
   });
-
   const [channels, setChannels] = useState([]);
   const [videos, setVideos] = useState([]);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState({ channels: false, vod: false, m3u: false });
-  const [activeTab, setActiveTab] = useState("manage_channels");
+  const [activeTab, setActiveTab] = useState("manage_vod"); // Iniciar en gestionar VOD para probar
 
   const clearMessages = useCallback(() => { setErrorMsg(""); setSuccessMsg(""); }, []);
 
@@ -203,7 +198,7 @@ export default function AdminPanel() {
         setSuccessMsg(`Canal "${dataToSend.name}" creado.`);
       }
       clearChannelForm();
-      fetchChannelsList(); // Actualiza la lista después de guardar
+      fetchChannelsList();
       setActiveTab("manage_channels");
     } catch (err) { setErrorMsg(err.message || "Error al guardar canal.");
     } finally { setIsSubmitting(false); }
@@ -215,7 +210,7 @@ export default function AdminPanel() {
     try {
       await deleteAdminChannel(id);
       setSuccessMsg(`Canal "${name || ''}" eliminado.`);
-      fetchChannelsList(); // Actualiza la lista
+      fetchChannelsList();
       if (channelId === id) clearChannelForm();
     } catch (err) { setErrorMsg(err.message || "Error al eliminar canal.");
     } finally { setIsSubmitting(false); }
@@ -266,7 +261,7 @@ export default function AdminPanel() {
       title: "", url: "", logo: "", description: "", trailerUrl: "",
       releaseYear: new Date().getFullYear().toString(), isFeatured: false, active: true,
       tipo: "pelicula", mainSection: MAIN_SECTION_VOD_OPTIONS[0]?.key || "",
-      genres: "", requiresPlan: [], // Inicializa como array vacío
+      genres: "", requiresPlan: [],
     });
   }, []);
 
@@ -276,16 +271,25 @@ export default function AdminPanel() {
   };
 
   const handleVodPlanChange = (planKey) => {
-    setVodForm(prev => ({
-      ...prev,
-      requiresPlan: prev.requiresPlan.includes(planKey)
-        ? prev.requiresPlan.filter(p => p !== planKey)
-        : [...prev.requiresPlan, planKey]
-    }));
+    setVodForm(prev => {
+      const currentPlans = prev.requiresPlan || [];
+      const newPlans = currentPlans.includes(planKey)
+        ? currentPlans.filter(p => p !== planKey)
+        : [...currentPlans, planKey];
+      return { ...prev, requiresPlan: newPlans };
+    });
   };
   
   const handleEditVodClick = useCallback((video) => {
     setVodId(video.id || video._id);
+    let plansForForm = [];
+    // Traducir 'basico' a 'gplay' si viene de la DB y asegurar que sea un array
+    if (Array.isArray(video.requiresPlan)) {
+      plansForForm = video.requiresPlan.map(p => p === "basico" ? "gplay" : String(p));
+    } else if (video.requiresPlan) { // Si es un string (dato antiguo como "basico")
+      plansForForm = [video.requiresPlan === "basico" ? "gplay" : String(video.requiresPlan)];
+    }
+
     setVodForm({
       title: video.title || "",
       url: video.url || "",
@@ -298,7 +302,7 @@ export default function AdminPanel() {
       tipo: video.tipo || "pelicula",
       mainSection: video.mainSection || MAIN_SECTION_VOD_OPTIONS[0]?.key || "",
       genres: Array.isArray(video.genres) ? video.genres.join(", ") : (video.genres || ""),
-      requiresPlan: Array.isArray(video.requiresPlan) ? video.requiresPlan.map(String) : (video.requiresPlan ? [String(video.requiresPlan)] : []),
+      requiresPlan: plansForForm.filter(p => ALL_AVAILABLE_PLANS.some(ap => ap.key === p)), // Solo cargar keys válidos
     });
     setActiveTab("add_vod");
     clearMessages();
@@ -309,21 +313,26 @@ export default function AdminPanel() {
     e.preventDefault();
     setIsSubmitting(true); clearMessages();
     try {
+      // Asegurarse de que solo se envíen los 'key' de planes válidos
+      const validPlansToSend = (vodForm.requiresPlan || [])
+        .map(p => p === "basico" ? "gplay" : p) // Traduce 'basico' a 'gplay' si aún estuviera
+        .filter(p => ALL_AVAILABLE_PLANS.some(ap => ap.key === p)); // Filtra por keys válidos
+
       const dataToSend = {
         ...vodForm,
         genres: vodForm.genres.split(',').map(g => g.trim()).filter(g => g),
-        // requiresPlan ya es un array
+        requiresPlan: validPlansToSend,
       };
+
       if (vodId) {
         await updateAdminVideo(vodId, dataToSend);
         setSuccessMsg(`VOD "${dataToSend.title}" actualizado.`);
       } else {
-        // Asegúrate que createAdminVideo en api.js apunte a /api/videos/upload-link
         await createAdminVideo(dataToSend); 
         setSuccessMsg(`VOD "${dataToSend.title}" creado.`);
       }
       clearVodForm();
-      fetchVideosList(); // Actualiza la lista después de guardar
+      fetchVideosList();
       setActiveTab("manage_vod");
     } catch (err) { setErrorMsg(err.message || "Error al guardar VOD.");
     } finally { setIsSubmitting(false); }
@@ -335,7 +344,7 @@ export default function AdminPanel() {
     try {
       await deleteAdminVideo(id);
       setSuccessMsg(`VOD "${title || ''}" eliminado.`);
-      fetchVideosList(); // Actualiza la lista
+      fetchVideosList();
       if (vodId === id) clearVodForm();
     } catch (err) { setErrorMsg(err.message || "Error al eliminar VOD.");
     } finally { setIsSubmitting(false); }
@@ -414,6 +423,7 @@ export default function AdminPanel() {
                         <Checkbox 
                             key={plan.key}
                             label={plan.displayName}
+                            value={plan.key}
                             checked={channelForm.requiresPlan.includes(plan.key)}
                             onChange={() => handleChannelPlanChange(plan.key)}
                         />
@@ -479,12 +489,10 @@ export default function AdminPanel() {
             <Input name="trailerUrl" type="url" placeholder="URL del Tráiler (YouTube u otro)" value={vodForm.trailerUrl} onChange={handleVodFormChange} />
             <Input name="releaseYear" type="number" placeholder="Año de Estreno" value={vodForm.releaseYear} onChange={handleVodFormChange} />
             <Input name="genres" placeholder="Géneros (separados por coma, ej: Acción, Comedia)" value={vodForm.genres} onChange={handleVodFormChange} />
-            
             <Select name="mainSection" value={vodForm.mainSection} onChange={handleVodFormChange}>
                 <option value="">-- Sin Sección Principal --</option>
                 {MAIN_SECTION_VOD_OPTIONS.map(opt => <option key={opt.key} value={opt.key}>{opt.displayName}</option>)}
             </Select>
-            
             <div className="space-y-2 pt-2">
                 <p className="text-sm font-medium text-gray-300">Planes Requeridos para este VOD:</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -492,13 +500,13 @@ export default function AdminPanel() {
                         <Checkbox 
                             key={plan.key}
                             label={plan.displayName}
-                            checked={vodForm.requiresPlan.includes(plan.key)}
+                            value={plan.key}
+                            checked={(vodForm.requiresPlan || []).includes(plan.key)}
                             onChange={() => handleVodPlanChange(plan.key)}
                         />
                     ))}
                 </div>
             </div>
-
             <div className="flex items-center space-x-6 pt-2">
                 <Checkbox label="Activo" name="active" checked={vodForm.active} onChange={handleVodFormChange} />
                 <Checkbox label="Destacado" name="isFeatured" checked={vodForm.isFeatured} onChange={handleVodFormChange} />
@@ -525,7 +533,7 @@ export default function AdminPanel() {
                             <p className="text-xs text-gray-400 truncate" title={vid.url}>{vid.url}</p>
                             <p className="text-xs text-gray-500">Sección VOD: <span className="text-gray-400">{MAIN_SECTION_VOD_OPTIONS.find(s=>s.key === vid.mainSection)?.displayName || vid.mainSection || 'N/A'}</span></p>
                             <p className="text-xs text-gray-500">
-                              Planes VOD: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === pKey)?.displayName || pKey).join(', ') || 'N/A'}</span>
+                              Planes VOD: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span>
                             </p>
                             <p className="text-xs text-gray-500">Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span></p>
                             <p className="text-xs text-gray-500">{vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}</p>
