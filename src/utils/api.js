@@ -1,12 +1,7 @@
 // src/utils/api.js
 import axiosInstance from './axiosInstance.js'; // O usa el alias: import axiosInstance from '@/utils/axiosInstance.js';
 
-// La función getAuthHeaders() ya no es necesaria aquí,
-// el interceptor en axiosInstance.js se encarga de añadir el token.
-
 /* =================== TV EN VIVO - USUARIO =================== */
-
-// Listar canales filtrados por sección
 export async function fetchUserChannels(sectionName = "Todos") {
   const relativePath = "/api/channels/list";
   const params = {};
@@ -16,8 +11,6 @@ export async function fetchUserChannels(sectionName = "Todos") {
   console.log(`API (fetchUserChannels - axios): GET ${relativePath} con params:`, params);
   try {
     const response = await axiosInstance.get(relativePath, { params });
-    // El mapeo que tenías para transformar la data de canales se puede mantener aquí si es necesario
-    // o hacerlo en el componente que consume esta función. Por simplicidad, devolvemos la data cruda.
     return response.data || [];
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar canales.";
@@ -26,7 +19,6 @@ export async function fetchUserChannels(sectionName = "Todos") {
   }
 }
 
-// Obtener secciones/categorías para filtros
 export async function fetchChannelFilterSections() {
   const relativePath = "/api/channels/sections";
   console.log(`API (fetchChannelFilterSections - axios): GET ${relativePath}`);
@@ -40,7 +32,6 @@ export async function fetchChannelFilterSections() {
   }
 }
 
-// Obtener canal específico por ID (para reproducir)
 export async function fetchChannelForPlayback(channelId) {
   const relativePath = `/api/channels/id/${channelId}`;
   console.log(`API (fetchChannelForPlayback - axios): GET ${relativePath}`);
@@ -55,9 +46,8 @@ export async function fetchChannelForPlayback(channelId) {
 }
 
 /* =================== VOD - USUARIO =================== */
-
 export async function fetchUserMovies() {
-  const relativePath = "/api/videos"; // Esta ruta en tu backend usa verifyToken
+  const relativePath = "/api/videos";
   const params = { tipo: "pelicula" };
   console.log(`API (fetchUserMovies - axios): GET ${relativePath} con params:`, params);
   try {
@@ -71,7 +61,7 @@ export async function fetchUserMovies() {
 }
 
 export async function fetchUserSeries() {
-  const relativePath = "/api/videos"; // Esta ruta en tu backend usa verifyToken
+  const relativePath = "/api/videos";
   const params = { tipo: "serie" };
   console.log(`API (fetchUserSeries - axios): GET ${relativePath} con params:`, params);
   try {
@@ -85,7 +75,7 @@ export async function fetchUserSeries() {
 }
 
 export async function fetchMainMovieSections() {
-  const relativePath = "/api/videos/main-sections"; // Esta ruta en tu backend usa verifyToken
+  const relativePath = "/api/videos/main-sections";
   console.log(`API (fetchMainMovieSections - axios): GET ${relativePath}`);
   try {
     const response = await axiosInstance.get(relativePath);
@@ -97,14 +87,10 @@ export async function fetchMainMovieSections() {
   }
 }
 
-/* =================== DESTACADOS - HOME (RUTAS PÚBLICAS CORREGIDAS) =================== */
-
+/* =================== DESTACADOS - HOME =================== */
 export async function fetchFeaturedChannels() {
-  // Llama a la ruta pública /api/channels/list con el filtro ?featured=true
-  // Tu backend en channels.routes.js tiene router.get("/list", getPublicChannels);
-  // y getPublicChannels en channel.controller.js debería manejar este query param.
   const relativePath = "/api/channels/list";
-  const params = { featured: "true" }; // El backend debe interpretar este 'true'
+  const params = { featured: "true" };
   console.log(`API (fetchFeaturedChannels - axios): GET ${relativePath} con params:`, params);
   try {
     const response = await axiosInstance.get(relativePath, { params });
@@ -113,7 +99,7 @@ export async function fetchFeaturedChannels() {
         console.warn(`API (fetchFeaturedChannels - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
+    return data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar canales destacados.";
     console.error(`API Error (fetchFeaturedChannels - axios): ${errorMsg}`, error.response?.data);
@@ -122,8 +108,6 @@ export async function fetchFeaturedChannels() {
 }
 
 export async function fetchFeaturedMovies() {
-  // Llama a la ruta pública /api/videos/public/featured-movies
-  // Tu backend en videos.routes.js tiene esta ruta definida sin verifyToken.
   const relativePath = "/api/videos/public/featured-movies";
   console.log(`API (fetchFeaturedMovies - axios): GET ${relativePath}`);
   try {
@@ -133,7 +117,7 @@ export async function fetchFeaturedMovies() {
         console.warn(`API (fetchFeaturedMovies - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
+    return data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar películas destacadas.";
     console.error(`API Error (fetchFeaturedMovies - axios): ${errorMsg}`, error.response?.data);
@@ -142,8 +126,6 @@ export async function fetchFeaturedMovies() {
 }
 
 export async function fetchFeaturedSeries() {
-  // Llama a la ruta pública /api/videos/public/featured-series
-  // Tu backend en videos.routes.js tiene esta ruta definida sin verifyToken.
   const relativePath = "/api/videos/public/featured-series";
   console.log(`API (fetchFeaturedSeries - axios): GET ${relativePath}`);
   try {
@@ -153,7 +135,7 @@ export async function fetchFeaturedSeries() {
         console.warn(`API (fetchFeaturedSeries - axios): La respuesta no fue un array, fue:`, data);
         return [];
     }
-    return data; // Asumimos que el backend ya devuelve el formato necesario o el mapeo se hace en Home.jsx
+    return data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al cargar series destacadas.";
     console.error(`API Error (fetchFeaturedSeries - axios): ${errorMsg}`, error.response?.data);
@@ -161,13 +143,7 @@ export async function fetchFeaturedSeries() {
   }
 }
 
-/* =================== AUTENTICACIÓN =================== */
-// Las funciones loginUser y registerUser han sido eliminadas de aquí.
-// Por favor, utiliza las funciones 'login' y 'register' de 'src/utils/AuthService.js',
-// que ya han sido configuradas para usar axiosInstance.
-
 /* =================== ADMIN - CANALES =================== */
-
 export async function fetchAdminChannels() {
   const relativePath = "/api/channels/admin/list";
   console.log(`API (fetchAdminChannels - axios): GET ${relativePath}`);
@@ -182,7 +158,7 @@ export async function fetchAdminChannels() {
 }
 
 export async function createAdminChannel(channelData) {
-  const relativePath = "/api/channels/admin"; // o /api/channels/admin/create si ese es tu endpoint exacto
+  const relativePath = "/api/channels/admin";
   console.log(`API (createAdminChannel - axios): POST ${relativePath} con data:`, channelData);
   try {
     const response = await axiosInstance.post(relativePath, channelData);
@@ -225,11 +201,7 @@ export async function processM3UForAdmin(formData) {
   const relativePath = "/api/channels/admin/process-m3u";
   console.log(`API (processM3UForAdmin - axios): POST ${relativePath}`);
   try {
-    const response = await axiosInstance.post(relativePath, formData, {
-      headers: {
-        // 'Content-Type': 'multipart/form-data' // Axios lo establece automáticamente para FormData
-      }
-    });
+    const response = await axiosInstance.post(relativePath, formData); // Axios maneja FormData Content-Type
     return response.data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Admin: Error al procesar M3U.";
@@ -239,7 +211,6 @@ export async function processM3UForAdmin(formData) {
 }
 
 /* =================== ADMIN - VIDEOS (VOD) =================== */
-
 export async function fetchAdminVideos() {
   const relativePath = "/api/videos";
   const params = { view: "admin" };
@@ -255,8 +226,7 @@ export async function fetchAdminVideos() {
 }
 
 export async function createAdminVideo(videoData) {
-  // CORRECCIÓN: Apuntar al endpoint correcto definido en videos.routes.js del backend
-  const relativePath = "/api/videos/upload-link"; 
+  const relativePath = "/api/videos/upload-link"; // Corregido para apuntar a la ruta de creación de VOD
   console.log(`API (createAdminVideo - axios): POST ${relativePath} con data:`, videoData);
   try {
     const response = await axiosInstance.post(relativePath, videoData);
@@ -291,6 +261,51 @@ export async function deleteAdminVideo(videoId) {
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Admin: Error al eliminar VOD.";
     console.error(`API Error (deleteAdminVideo - axios): ${errorMsg}`, error.response?.data);
+    throw new Error(errorMsg);
+  }
+}
+
+/* =================== ADMIN - GESTIÓN DE USUARIOS =================== */
+
+export async function fetchAdminUsers() {
+  const relativePath = "/api/admin/users"; // Según definimos en admin.routes.js
+  console.log(`API (fetchAdminUsers - axios): GET ${relativePath}`);
+  try {
+    const response = await axiosInstance.get(relativePath);
+    return response.data || []; // Espera un array de usuarios
+  } catch (error) {
+    const errorMsg = error.response?.data?.error || error.message || "Admin: Error al cargar la lista de usuarios.";
+    console.error(`API Error (fetchAdminUsers - axios): ${errorMsg}`, error.response?.data);
+    throw new Error(errorMsg);
+  }
+}
+
+export async function updateAdminUserPlan(userId, plan) {
+  const relativePath = `/api/admin/users/${userId}/plan`;
+  console.log(`API (updateAdminUserPlan - axios): PUT ${relativePath} con plan: ${plan}`);
+  try {
+    const response = await axiosInstance.put(relativePath, { plan }); // El cuerpo es { plan: 'nuevoPlan' }
+    return response.data; // Espera { message: "...", user: {...} }
+  } catch (error) {
+    const errorMsg = error.response?.data?.error || error.message || "Admin: Error al actualizar el plan del usuario.";
+    console.error(`API Error (updateAdminUserPlan - axios): ${errorMsg}`, error.response?.data);
+    throw new Error(errorMsg);
+  }
+}
+
+export async function updateAdminUserStatus(userId, isActive, expiresAt = null) {
+  const relativePath = `/api/admin/users/${userId}/status`;
+  const payload = { isActive };
+  if (expiresAt !== null) { // Solo incluir expiresAt si se proporciona un valor
+    payload.expiresAt = expiresAt;
+  }
+  console.log(`API (updateAdminUserStatus - axios): PUT ${relativePath} con payload:`, payload);
+  try {
+    const response = await axiosInstance.put(relativePath, payload); 
+    return response.data; // Espera { message: "...", user: {...} }
+  } catch (error) {
+    const errorMsg = error.response?.data?.error || error.message || "Admin: Error al actualizar el estado del usuario.";
+    console.error(`API Error (updateAdminUserStatus - axios): ${errorMsg}`, error.response?.data);
     throw new Error(errorMsg);
   }
 }
