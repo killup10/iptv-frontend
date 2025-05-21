@@ -1,28 +1,37 @@
-// src/components/AdminRoute.jsx
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext.jsx'; // Usando alias
+// iptv-backend/routes/admin.routes.js
+import express from "express";
+import { verifyToken, isAdmin } from "../middlewares/verifyToken.js"; // Asegúrate que la ruta sea correcta
 
-// Ya no se importa ni se instancia UploadManual aquí
+// Importaremos las funciones del controlador de admin (o un controlador de usuarios si lo prefieres)
+// Asumiremos que estas funciones estarán en admin.controller.js por ahora
+import {
+  getAllUsersAdmin,
+  updateUserPlanAdmin,
+  updateUserStatusAdmin,
+  // (Opcional) getUserByIdAdmin,
+  // ... (aquí podrían ir otras funciones de admin que ya tengas, como las de contenido)
+} from "../controllers/admin.controller.js"; // Asegúrate que la ruta sea correcta
 
-const AdminRoute = ({ children }) => {
-  const { user, isLoadingAuth } = useAuth();
+const router = express.Router();
 
-  if (isLoadingAuth) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+// --- RUTAS PARA LA GESTIÓN DE USUARIOS (SOLO ADMIN) ---
 
-  if (!user || user.role !== 'admin') {
-    // Si no es admin, redirigir a la página de inicio o a una página de "no autorizado"
-    return <Navigate to="/" replace />;
-  }
+// GET /api/admin/users - Obtener todos los usuarios para el panel de admin
+router.get("/users", verifyToken, isAdmin, getAllUsersAdmin);
 
-  // Si es admin y la autenticación ha cargado, renderizar el contenido protegido
-  return children;
-};
+// PUT /api/admin/users/:userId/plan - Actualizar el plan de un usuario específico
+router.put("/users/:userId/plan", verifyToken, isAdmin, updateUserPlanAdmin);
 
-export default AdminRoute;
+// PUT /api/admin/users/:userId/status - Activar/desactivar un usuario específico
+router.put("/users/:userId/status", verifyToken, isAdmin, updateUserStatusAdmin);
+
+// (Opcional) GET /api/admin/users/:userId - Obtener detalles de un usuario específico
+// router.get("/users/:userId", verifyToken, isAdmin, getUserByIdAdmin);
+
+
+// --- OTRAS RUTAS DE ADMINISTRACIÓN QUE YA PUEDAS TENER ---
+// Por ejemplo, si tenías rutas para estadísticas, configuraciones globales, etc.
+// router.get("/dashboard-stats", verifyToken, isAdmin, getDashboardStats);
+// router.post("/settings", verifyToken, isAdmin, updateGlobalSettings);
+
+export default router;
