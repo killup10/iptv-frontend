@@ -6,8 +6,8 @@ module.exports = {
     "dist/**/*",
     "electron.cjs",
     "package.json",
-    "preload.cjs",
-    "node_modules/electron/dist/**"
+    "preload.cjs"
+
   ],
   extraResources: [
     {
