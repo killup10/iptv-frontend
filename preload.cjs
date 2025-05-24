@@ -1,21 +1,19 @@
 // iptv-frontend/preload.cjs
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge } = require('electron'); // Solo necesitas contextBridge aquí por ahora
 
-console.log('[PRELOAD_LOG] Script de precarga (preload.cjs) ejecutado.');
+console.log('[PRELOAD_LOG] Script de precarga (preload.cjs) ejecutándose...');
 
-// Ejemplo de cómo exponer algo al proceso de renderizado de forma segura:
-contextBridge.exposeInMainWorld('electronAPI', {
-  // Ejemplo: podrías exponer funciones para enviar mensajes al proceso principal
-  // sendMessageToMain: (channel, data) => ipcRenderer.send(channel, data),
-  // Y para recibir respuestas
-  // onReplyFromMain: (channel, func) => {
-  //   ipcRenderer.on(channel, (event, ...args) => func(...args));
-  // }
-  versions: {
-    node: () => process.versions.node,
-    chrome: () => process.versions.chrome,
-    electron: () => process.versions.electron
-  }
-});
-
-console.log('[PRELOAD_LOG] electronAPI expuesta a window.');
+try {
+  contextBridge.exposeInMainWorld('electronAPI', {
+    isElectron: () => true, // <--- ¡AÑADE ESTA LÍNEA!
+    versions: { // Puedes mantener esto si lo usas en otro lado
+      node: () => process.versions.node,
+      chrome: () => process.versions.chrome,
+      electron: () => process.versions.electron
+    }
+    // Aquí puedes agregar otras funciones o propiedades que necesites exponer
+  });
+  console.log('[PRELOAD_LOG] electronAPI (con isElectron) expuesta a window.electronAPI');
+} catch (error) {
+  console.error('[PRELOAD_ERROR] Error al exponer electronAPI:', error);
+}
