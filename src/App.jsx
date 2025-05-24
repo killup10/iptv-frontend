@@ -1,18 +1,30 @@
+// iptv-frontend/src/App.jsx
 import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
 
 function App() {
+  console.log('[App.jsx] Renderizando AppLayout (App.jsx)...'); // LOG AÑADIDO
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Loguear estado del usuario y ubicación para depuración
+  useEffect(() => {
+    console.log('[App.jsx] Estado del usuario:', user);
+    console.log('[App.jsx] Ubicación actual:', location.pathname);
+  }, [user, location.pathname]);
+
   const isAuthPage = location.pathname.startsWith("/login") || location.pathname.startsWith("/register");
   const [scrolled, setScrolled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Detectar scroll para cambiar el fondo del header
   useEffect(() => {
-    if (isAuthPage) return;
+    if (isAuthPage) {
+      setScrolled(false); // Asegurar que no haya fondo de scroll en páginas de auth
+      return;
+    }
 
     const handleScroll = () => {
       const isScrolled = window.scrollY > 10;
@@ -21,8 +33,12 @@ function App() {
       }
     };
 
+    console.log('[App.jsx] Añadiendo event listener para scroll.');
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      console.log('[App.jsx] Eliminando event listener para scroll.');
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [scrolled, isAuthPage]);
 
   // Cerrar dropdown al hacer clic fuera
@@ -43,6 +59,7 @@ function App() {
   }, [dropdownOpen]);
 
   const handleLogout = () => {
+    console.log('[App.jsx] Ejecutando handleLogout...');
     logout();
     navigate("/login");
   };
@@ -54,10 +71,9 @@ function App() {
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center">
               <Link to="/" className="flex items-center mr-10">
-              <span className="text-white font-bold text-2xl">
-  <span className="text-red-600">T</span>eamG Play
-</span>
-
+                <span className="text-white font-bold text-2xl">
+                  <span className="text-red-600">T</span>eamG Play
+                </span>
               </Link>
 
               {user && (
@@ -115,7 +131,7 @@ function App() {
         </header>
       )}
 
-      <main className={`flex-grow ${!isAuthPage ? 'pt-16' : ''}`}>
+      <main className={`flex-grow ${!isAuthPage ? 'pt-16 md:pt-20' : ''}`}> {/* Ajuste de padding-top responsivo */}
         <Outlet />
       </main>
 
@@ -135,7 +151,7 @@ function App() {
                   <ul className="space-y-2">
                     <li><Link to="/" className="hover:text-white transition">Inicio</Link></li>
                     <li><Link to="/tv" className="hover:text-white transition">TV en Vivo</Link></li>
-                    <li><Link to="/movies" className="hover:text-white transition">VOD</Link></li>
+                    <li><Link to="/movies" className="hover:text-white transition">VOD</Link></li> {/* Considera si esto debería ser /movies y /series */}
                   </ul>
                 </div>
                 <div>
