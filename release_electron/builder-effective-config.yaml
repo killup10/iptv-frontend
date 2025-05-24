@@ -9,7 +9,6 @@ files:
       - electron.cjs
       - package.json
       - preload.cjs
-      - node_modules/electron/dist/**
 extraResources:
   - from: ffmpeg_custom/ffmpeg.dll
     to: ffmpeg_custom_packaged
