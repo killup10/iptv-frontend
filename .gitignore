@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Ignorar archivos de Electron
+/release_electron/
+/dist/
+/out/
+*.exe
+*.asar
+
+# Dependencias
+node_modules/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Builds temporales
+*.log
+*.temp
+*.bak
