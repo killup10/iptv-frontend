@@ -1,26 +1,33 @@
 // src/pages/Watch.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import VideoPlayer from "../components/VideoPlayer.jsx";
-import { useAuth } from "@/context/AuthContext.jsx";
+import VideoPlayer from "../components/VideoPlayer.jsx"; // Tu VideoPlayer actualizado
+import { useAuth } from "@/context/AuthContext.jsx"; // Asumo que no se usa directamente aquí si axiosInstance maneja token
 import { getPlayableUrl } from "@/utils/playerUtils.js";
 import axiosInstance from "@/utils/axiosInstance.js";
 
 export function Watch() {
   const { itemType, itemId } = useParams();
-  const location = useLocation();
+  const location = useLocation(); // Hook para acceder al estado de la ruta
   const [itemData, setItemData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const M3U8_PROXY_BASE_URL = "https://stream.teamg.store";
-  const startTime = location.state?.startTime || 0;
+  const M3U8_PROXY_BASE_URL = "https://stream.teamg.store"; // O la URL de tu proxy si es diferente
 
-  console.log(`[Watch.jsx] Renderizando. itemType: ${itemType}, itemId: ${itemId}, startTime desde location.state: ${location.state?.startTime}`);
+  // Determinar si es "Continuar Viendo" y el tiempo de inicio
+  // Si location.state.continueWatching es true, significa que venimos de "Continuar Viendo"
+  const isContinueWatching = location.state?.continueWatching === true;
+  const startTimeFromState = location.state?.startTime || 0; // Tiempo guardado
+
+  // initialAutoplay será false si es "Continuar Viendo", de lo contrario true.
+  const shouldAutoplay = !isContinueWatching;
+
+  console.log(`[Watch.jsx] Renderizando. itemType: ${itemType}, itemId: ${itemId}, startTime desde location: ${startTimeFromState}, isContinueWatching: ${isContinueWatching}, shouldAutoplay: ${shouldAutoplay}`);
 
   useEffect(() => {
-    console.log(`[Watch.jsx] useEffect ejecutándose. itemId: ${itemId}, itemType: ${itemType}, startTime (del estado del componente): ${startTime}`);
+    console.log(`[Watch.jsx] useEffect [itemId, itemType] ejecutándose. itemId: ${itemId}, itemType: ${itemType}`);
     const fetchItemDetails = async () => {
       if (!itemId || !itemType) {
         console.error("[Watch.jsx] Faltan itemId o itemType. No se puede hacer fetch.");
@@ -48,19 +55,21 @@ export function Watch() {
         console.log(`[Watch.jsx] Haciendo GET a endpoint: ${endpoint}`);
         const response = await axiosInstance.get(endpoint);
         data = response.data;
-        console.log("[Watch.jsx] Datos recibidos del backend:", JSON.parse(JSON.stringify(data)));
+        console.log("[Watch.jsx] Datos recibidos del backend:", JSON.parse(JSON.stringify(data || {})));
 
         if (!data) {
           throw new Error("No se recibieron datos del backend para este item.");
         }
         const normalizedData = {
-          id: data._id || data.id,
-          name: data.name || data.title || data.titulo || "Contenido",
-          url: data.url, // ¡MUY IMPORTANTE VERIFICAR ESTA URL!
+          id: data._id || data.id, // Usar _id como fallback si id no existe
+          name: data.name || data.title || data.titulo || "Contenido sin título",
+          url: data.url,
           description: data.description || data.descripcion || "",
           releaseYear: data.releaseYear,
           tipo: data.tipo || itemType,
-          uniqueId: data._id || data.id,
+          // Asegúrate de que 'uniqueId' se mapee correctamente al ID que usa useVideoProgress
+          // Si tu useVideoProgress usa 'itemId', entonces 'itemId' debe ser el ID único del video/canal.
+          // Aquí estoy asumiendo que el 'itemId' de la URL es el que se usa para el progreso.
         };
         console.log("[Watch.jsx] Datos normalizados (itemData) listos para setear:", JSON.parse(JSON.stringify(normalizedData)));
         setItemData(normalizedData);
@@ -72,20 +81,16 @@ export function Watch() {
       }
     };
     fetchItemDetails();
-  }, [itemId, itemType]); // startTime no debería estar aquí como dependencia directa para el fetch,
-                           // ya que el item es el mismo, solo cambia el punto de inicio.
+  }, [itemId, itemType]); // No incluir startTimeFromState aquí, ya que no cambia el *item* a fetchear
 
   if (loading) return <div className="flex justify-center items-center min-h-screen bg-black"><div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
   
-  // Loguear itemData ANTES de verificar errores o URL
-  // console.log("[Watch.jsx] Estado de itemData ANTES de la verificación de error/url:", itemData ? JSON.parse(JSON.stringify(itemData)) : null);
-
   if (error) {
     console.error("[Watch.jsx] Renderizando error:", error);
     return <div className="text-red-500 p-10 text-center min-h-screen bg-black pt-20">{error} <button onClick={() => navigate(-1)} className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded">Volver</button></div>;
   }
   
-  if (!itemData) { // Si itemData es null después de cargar y sin error, es un caso raro.
+  if (!itemData) {
     console.warn("[Watch.jsx] Renderizando: itemData es null pero no hay error ni loading.");
     return <div className="text-white p-10 text-center min-h-screen bg-black pt-20">Información del contenido no disponible. <button onClick={() => navigate(-1)} className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded">Volver</button></div>;
   }
@@ -97,11 +102,10 @@ export function Watch() {
 
   const finalPlayableUrl = getPlayableUrl(itemData, M3U8_PROXY_BASE_URL);
   console.log(`[Watch.jsx] finalPlayableUrl calculada para VideoPlayer: ${finalPlayableUrl}`);
-  console.log(`[Watch.jsx] Props para VideoPlayer: url=${finalPlayableUrl}, itemId=${itemData.uniqueId}, startTime=${startTime}`);
-
+  console.log(`[Watch.jsx] Props para VideoPlayer: url=${finalPlayableUrl}, itemId=${itemId}, startTime=${startTimeFromState}, initialAutoplay=${shouldAutoplay}`);
 
   return (
-    <div className="bg-zinc-900 min-h-screen flex flex-col">
+    <div className="bg-zinc-900 min-h-screen flex flex-col pt-16"> {/* Ajuste de padding-top si el header es fixed */}
       <div className="container mx-auto px-2 sm:px-4 py-4 flex-grow flex flex-col">
         <div className="mb-4 flex items-center justify-between w-full max-w-screen-xl mx-auto">
           <button
@@ -123,8 +127,9 @@ export function Watch() {
               {finalPlayableUrl ? (
                 <VideoPlayer
                   url={finalPlayableUrl}
-                  itemId={itemData.uniqueId}
-                  startTime={startTime}
+                  itemId={itemId} // Pasar el itemId de la URL, que es el que usa useVideoProgress
+                  startTime={startTimeFromState}
+                  initialAutoplay={shouldAutoplay} // Pasar la prop para controlar autoplay
                 />
               ) : (
                 <p className="text-orange-400 text-center py-10">La URL para este contenido no es válida o no se pudo procesar.</p>
