@@ -7,11 +7,9 @@ import {
   fetchFeaturedChannels,
   fetchFeaturedMovies,
   fetchFeaturedSeries,
-  // CORRECCIÓN AQUÍ:
-  // Para renombrar, se usa 'nombreOriginal as nuevoNombre'
-  fetchUserMovies as fetchAllMovies,    // Renombrar fetchUserMovies a fetchAllMovies
-  fetchUserSeries as fetchAllSeries     // Renombrar fetchUserSeries a fetchAllSeries
-} from '../utils/api.js'; // La ruta a tu archivo api.js
+  fetchUserMovies as fetchAllMovies,
+  fetchUserSeries as fetchAllSeries
+} from '../utils/api.js';
 import TrailerModal from '../components/TrailerModal.jsx';
 
 export function Home() {
@@ -22,7 +20,7 @@ export function Home() {
   const [featuredMovies, setFeaturedMovies] = useState([]);
   const [featuredSeries, setFeaturedSeries] = useState([]);
   const [continueWatchingItems, setContinueWatchingItems] = useState([]);
-  const [allContentMap, setAllContentMap] = useState(new Map()); // Para buscar detalles de items
+  const [allContentMap, setAllContentMap] = useState(new Map());
   const [error, setError] = useState(null);
 
   const [showTrailerModal, setShowTrailerModal] = useState(false);
@@ -43,18 +41,30 @@ export function Home() {
           fetchFeaturedChannels(),
           fetchFeaturedMovies(),
           fetchFeaturedSeries(),
-          fetchAllMovies(), // Usar el alias
-          fetchAllSeries(), // Usar el alias
+          fetchAllMovies(),
+          fetchAllSeries(),
         ]);
 
-        if (channelsResult.status === 'fulfilled') setFeaturedChannels(channelsResult.value?.slice(0, 15) || []);
-        else console.error('Error cargando canales destacados:', channelsResult.reason);
+        if (channelsResult.status === 'fulfilled' && Array.isArray(channelsResult.value)) {
+          setFeaturedChannels(channelsResult.value.slice(0, 15));
+        } else {
+          console.error('[Home.jsx] Error cargando canales destacados:', channelsResult.reason);
+          setFeaturedChannels([]);
+        }
 
-        if (moviesResult.status === 'fulfilled') setFeaturedMovies(moviesResult.value?.slice(0, 15) || []);
-        else console.error('Error cargando películas destacadas:', moviesResult.reason);
+        if (moviesResult.status === 'fulfilled' && Array.isArray(moviesResult.value)) {
+          setFeaturedMovies(moviesResult.value.slice(0, 15));
+        } else {
+          console.error('[Home.jsx] Error cargando películas destacadas:', moviesResult.reason);
+          setFeaturedMovies([]);
+        }
         
-        if (seriesResult.status === 'fulfilled') setFeaturedSeries(seriesResult.value?.slice(0, 15) || []);
-        else console.error('Error cargando series destacadas:', seriesResult.reason);
+        if (seriesResult.status === 'fulfilled' && Array.isArray(seriesResult.value)) {
+          setFeaturedSeries(seriesResult.value.slice(0, 15));
+        } else {
+          console.error('[Home.jsx] Error cargando series destacadas:', seriesResult.reason);
+          setFeaturedSeries([]);
+        }
 
         const contentMap = new Map();
         if (allMoviesData.status === 'fulfilled' && Array.isArray(allMoviesData.value)) {
@@ -63,10 +73,11 @@ export function Home() {
         if (allSeriesData.status === 'fulfilled' && Array.isArray(allSeriesData.value)) {
           allSeriesData.value.forEach(item => contentMap.set(item._id || item.id, {...item, itemType: 'serie'}));
         }
+        console.log('[Home.jsx] allContentMap creado:', contentMap);
         setAllContentMap(contentMap);
 
       } catch (err) {
-        console.error('Home.jsx: Error general en loadAllData:', err);
+        console.error('[Home.jsx] Error general en loadAllData:', err);
         setError(err.message || "Error al cargar contenido.");
       } finally {
         setLoading(false);
@@ -75,20 +86,31 @@ export function Home() {
     if (user) {
         loadAllData();
     } else {
-        setLoading(false);
+        setLoading(false); 
     }
   }, [user]);
 
   useEffect(() => {
-    if (loading || allContentMap.size === 0) return;
-
+    if (loading || allContentMap.size === 0) {
+      // console.log('[Home.jsx] Saltando useEffect de Continuar Viendo: loading o allContentMap vacío.');
+      return;
+    }
+    console.log('[Home.jsx] Procesando "Continuar Viendo"...');
     try {
-      const progressData = JSON.parse(localStorage.getItem('videoProgress') || '{}');
+      const progressDataString = localStorage.getItem('videoProgress');
+      // console.log('[Home.jsx] videoProgress desde localStorage (string):', progressDataString);
+      const progressData = JSON.parse(progressDataString || '{}');
+      // console.log('[Home.jsx] videoProgress parseado:', progressData);
+
       const itemsWithProgress = Object.entries(progressData)
         .map(([itemId, data]) => {
+          // console.log(`[Home.jsx] Buscando en allContentMap por itemId: ${itemId}`);
           const fullItemDetails = allContentMap.get(itemId);
+          // console.log(`[Home.jsx] fullItemDetails para ${itemId}:`, fullItemDetails ? JSON.parse(JSON.stringify(fullItemDetails)) : 'No encontrado');
+          // console.log(`[Home.jsx] Datos de progreso para ${itemId}:`, data);
+
           if (fullItemDetails && data.duration > 0 && data.time < data.duration - 15) {
-            return {
+            const hydratedItem = {
               ...fullItemDetails,
               id: itemId,
               _id: itemId,
@@ -97,34 +119,49 @@ export function Home() {
               lastWatched: data.lastWatched,
               progressPercent: (data.time / data.duration) * 100,
             };
+            // console.log(`[Home.jsx] Item hidratado para Continuar Viendo (${itemId}):`, JSON.parse(JSON.stringify(hydratedItem)));
+            return hydratedItem;
           }
+          // console.log(`[Home.jsx] Item ${itemId} filtrado o no encontrado para Continuar Viendo.`);
           return null;
         })
         .filter(Boolean)
         .sort((a, b) => b.lastWatched - a.lastWatched)
         .slice(0, 10);
-
+      
+      console.log('[Home.jsx] Items finales para "Continuar Viendo":', JSON.parse(JSON.stringify(itemsWithProgress)));
       setContinueWatchingItems(itemsWithProgress);
     } catch (e) {
-      console.error("Error procesando 'Continuar Viendo':", e);
+      console.error("[Home.jsx] Error procesando 'Continuar Viendo':", e);
       setContinueWatchingItems([]);
     }
   }, [loading, allContentMap]);
 
   const handleItemClick = (item, itemTypeFromCarousel) => {
-    const type = item.itemType || itemTypeFromCarousel;
+    // LOG PROFUNDO DEL ITEM AL HACER CLIC
+    console.log("[Home.jsx] handleItemClick - Item recibido:", JSON.parse(JSON.stringify(item)));
+    console.log("[Home.jsx] handleItemClick - itemTypeFromCarousel:", itemTypeFromCarousel);
+
+    const type = item.itemType || itemTypeFromCarousel; // Priorizar itemType del objeto item
     const id = item.id || item._id;
 
+    console.log(`[Home.jsx] handleItemClick - Tipo determinado: ${type}, ID determinado: ${id}`);
+
     if (!type || !id) {
-      console.error("Home.jsx: Tipo o ID del item no definido.", item);
+      console.error("[Home.jsx] handleItemClick: Tipo o ID del item no definido. No se puede navegar.", item);
+      alert("Error: No se pudo determinar el contenido a reproducir."); // Feedback al usuario
       return;
     }
     
     const navigationState = {};
-    if (item.progressTime) {
+    if (typeof item.progressTime === 'number' && item.progressTime >= 0) { // Validar progressTime
+      console.log("[Home.jsx] handleItemClick: Tiene progressTime, añadiendo startTime a la navegación:", item.progressTime);
       navigationState.startTime = item.progressTime;
+    } else {
+      console.log("[Home.jsx] handleItemClick: No tiene progressTime válido o es undefined.");
     }
     
+    console.log(`[Home.jsx] Navegando a: /watch/${type}/${id} con estado:`, navigationState);
     navigate(`/watch/${type}/${id}`, { state: navigationState });
   };
 
@@ -161,15 +198,16 @@ export function Home() {
   return (
     <>
       <div className="bg-gray-900 text-white min-h-screen">
-        <div className="pt-20 md:pt-24 pb-8 space-y-8 md:space-y-12">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 md:pt-24 pb-8 space-y-8 md:space-y-12">
           {continueWatchingItems.length > 0 && (
             <Carousel
               title="Continuar Viendo"
               items={continueWatchingItems}
-              onItemClick={(item) => handleItemClick(item, item.itemType)}
-              itemType="movie" // Default, pero el item tiene su propio itemType
+              onItemClick={(item) => handleItemClick(item, item.itemType || 'movie')} // Asegurar un itemType si item.itemType es undefined
+              itemType="movie" 
             />
           )}
+          {/* Resto de los carruseles (Destacados, etc.) */}
           {featuredChannels.length > 0 && (
             <Carousel
               title="Canales en Vivo Destacados"
