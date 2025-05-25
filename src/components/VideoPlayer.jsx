@@ -1,155 +1,393 @@
 // src/components/VideoPlayer.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import ReactPlayer from 'react-player/lazy'; // Usar lazy load para mejor rendimiento inicial
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactPlayer from 'react-player/lazy';
 import Hls from 'hls.js';
+import {
+  PlayIcon as PlaySolidIcon,
+  PauseIcon as PauseSolidIcon,
+  SpeakerWaveIcon as SpeakerWaveSolidIcon,
+  SpeakerXMarkIcon as SpeakerXMarkSolidIcon,
+  ArrowsPointingOutIcon as ArrowsPointingOutSolidIcon,
+  ArrowsPointingInIcon as ArrowsPointingInSolidIcon,
+  BackwardIcon as BackwardSolidIcon, // Para -10s
+  ForwardIcon as ForwardSolidIcon,   // Para +10s
+} from '@heroicons/react/24/solid';
 
-export default function VideoPlayer({ url }) {
+// Función para formatear el tiempo (ej: 01:23)
+const formatTime = (seconds) => {
+  if (isNaN(seconds) || seconds < 0) return '00:00';
+  const date = new Date(seconds * 1000);
+  const hh = date.getUTCHours();
+  const mm = date.getUTCMinutes();
+  const ss = date.getUTCSeconds().toString().padStart(2, '0');
+  if (hh) {
+    return `${hh}:${mm.toString().padStart(2, '0')}:${ss}`;
+  }
+  return `${mm.toString().padStart(2, '0')}:${ss}`;
+};
+
+// Hook para guardar progreso en localStorage
+const useVideoProgress = (itemId) => {
+  const saveProgress = useCallback((currentTime, duration) => {
+    if (!itemId || isNaN(currentTime) || isNaN(duration) || duration === 0) return;
+    // No guardar si es muy al inicio o muy al final para considerarlo "visto"
+    if (currentTime < 5 || currentTime > duration - 15) {
+        // Si está casi terminado, podríamos querer limpiarlo de "Continuar Viendo"
+        if (currentTime > duration - 15 && duration > 0) {
+            try {
+                const progressData = JSON.parse(localStorage.getItem('videoProgress') || '{}');
+                delete progressData[itemId];
+                localStorage.setItem('videoProgress', JSON.stringify(progressData));
+            } catch (e) { console.error("Error limpiando progreso:", e); }
+        }
+      return;
+    }
+    try {
+      const progressData = JSON.parse(localStorage.getItem('videoProgress') || '{}');
+      progressData[itemId] = { time: currentTime, duration: duration, lastWatched: Date.now() };
+      localStorage.setItem('videoProgress', JSON.stringify(progressData));
+    } catch (e) {
+      console.error("Error guardando progreso:", e);
+    }
+  }, [itemId]);
+  return { saveProgress };
+};
+
+
+export default function VideoPlayer({ url, itemId, startTime = 0 }) {
+  const playerRef = useRef(null);
+  const playerWrapperRef = useRef(null);
+  const controlsTimeoutRef = useRef(null);
+  const hlsVideoElementRef = useRef(null); // Renombrado para HLS
+  const hlsInstanceRef = useRef(null);
+
+  const { saveProgress } = useVideoProgress(itemId);
+
   const [error, setError] = useState(null);
   const [isHlsStream, setIsHlsStream] = useState(false);
-  const videoElementRef = useRef(null); // Ref para el tag <video> si usamos HLS.js manualmente
-  const hlsInstanceRef = useRef(null);  // Ref para la instancia de HLS.js
+  
+  const [playing, setPlaying] = useState(true);
+  const [volume, setVolume] = useState(0.8);
+  const [muted, setMuted] = useState(false);
+  const [playedSeconds, setPlayedSeconds] = useState(startTime);
+  const [loadedSeconds, setLoadedSeconds] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [seeking, setSeeking] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+
 
   useEffect(() => {
-    setError(null); // Limpiar errores al cambiar de URL
-    // Una detección más robusta para URLs M3U8, incluyendo aquellas con query params
+    setError(null);
     const newIsHls = url && (url.toLowerCase().includes('.m3u8') || url.toLowerCase().includes('m3u8?'));
-    console.log(`VideoPlayer: URL recibida: ${url}, ¿Es HLS? ${newIsHls}`);
     setIsHlsStream(newIsHls);
-  }, [url]);
+    setPlaying(true);
+    setPlayedSeconds(startTime); // Iniciar desde startTime
+    setDuration(0);
+    setLoadedSeconds(0);
+    setShowControls(true);
+    setIsBuffering(newIsHls || true); // Asumir buffering al inicio, especialmente para HLS
+  }, [url, startTime]);
+
+  const handlePlayerReady = useCallback(() => {
+    if (playerRef.current && startTime > 0 && playerRef.current.getDuration() > startTime) {
+      playerRef.current.seekTo(startTime, 'seconds');
+    }
+    if (hlsVideoElementRef.current && startTime > 0 && hlsVideoElementRef.current.duration > startTime) {
+        hlsVideoElementRef.current.currentTime = startTime;
+    }
+    setIsBuffering(false);
+    setPlaying(true); // Intentar autoplay después de que esté listo y se haya hecho seek si es necesario
+  }, [startTime]);
 
   useEffect(() => {
-    // Limpiar instancia HLS anterior si existe cuando la URL o el tipo de stream cambian
-    if (hlsInstanceRef.current) {
-      console.log("VideoPlayer: Destruyendo instancia HLS anterior.");
-      hlsInstanceRef.current.destroy();
-      hlsInstanceRef.current = null;
-    }
-
-    if (isHlsStream && Hls.isSupported() && videoElementRef.current && url) {
-      console.log("VideoPlayer: Configurando Hls.js para URL:", url);
-      const hls = new Hls({
-         debug: false, // Poner en true para logs detallados de HLS.js en la consola
-         // Puedes añadir más configuraciones de HLS.js aquí si es necesario
-         // Por ejemplo, para manejo de errores de red:
-         // abrEwmaDefaultEstimate: 500000, // 500 kbps, un valor inicial para el estimador de ancho de banda
-         // AbrController.capLevelToPlayerSize = true; // Ajusta la calidad al tamaño del reproductor
-      });
+    if (hlsInstanceRef.current) hlsInstanceRef.current.destroy();
+    if (isHlsStream && Hls.isSupported() && hlsVideoElementRef.current && url) {
+      const hls = new Hls({ 
+        // Configuración robusta de HLS
+        abrEwmaDefaultEstimate: 500000, // 500 kbps
+        abrMaxStarvationDelay: 5,
+        lowLatencyMode: true, // Para streams en vivo
+        maxBufferLength: 30,
+        maxMaxBufferLength: 600,
+        backBufferLength: 90, // Aumentar si hay rebuffering en seeks hacia atrás
+        fragLoadingTimeOut: 20000, // ms
+        manifestLoadingTimeOut: 10000, // ms
+        levelLoadingTimeOut: 10000, // ms
+       });
       hls.loadSource(url);
-      hls.attachMedia(videoElementRef.current);
-
+      hls.attachMedia(hlsVideoElementRef.current);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log("VideoPlayer: Manifiesto HLS parseado, intentando play.");
-        // Intentar reproducir una vez que el manifiesto esté listo
-        videoElementRef.current?.play().catch(playError => {
-          console.warn("VideoPlayer (HLS.js): Error al intentar video.play() tras manifest parsed:", playError);
-          // No establecer error aquí necesariamente, el navegador podría bloquear autoplay.
-          // El usuario puede necesitar interactuar para iniciar.
-        });
+        handlePlayerReady(); 
       });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('VideoPlayer: HLS.js Error:', data);
-        let errorMsg = `Error HLS (${data.type}): ${data.details || 'Detalles no disponibles'}`;
+      hls.on(Hls.Events.ERROR, (event, data) => { 
+        console.error('HLS.js Error:', data);
         if (data.fatal) {
-          errorMsg += " (Error fatal)";
-          // En errores fatales, HLS.js puede necesitar ser destruido y recreado
-          // o podría ser un problema con el stream/CORS/red que no se puede recuperar.
-          // hls.destroy(); // HLS.js a menudo intenta recuperarse, pero esta es una opción
-        }
-        setError(errorMsg);
-      });
-      hlsInstanceRef.current = hls; // Guardar la instancia para poder destruirla luego
-
-      // Función de limpieza para este efecto
-      return () => {
-        if (hlsInstanceRef.current) {
-          console.log("VideoPlayer: Destruyendo instancia HLS en cleanup de useEffect (isHlsStream o url cambiaron).");
-          hlsInstanceRef.current.destroy();
-          hlsInstanceRef.current = null;
-        }
-      };
-    } else if (isHlsStream && !Hls.isSupported() && videoElementRef.current) {
-        // Fallback a reproducción nativa de HLS si HLS.js no es soportado pero el navegador sí
-        if (videoElementRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-            console.log("VideoPlayer: HLS.js no soportado, intentando reproducción HLS nativa para", url);
-            videoElementRef.current.src = url;
-            videoElementRef.current.addEventListener('loadedmetadata', () => {
-                videoElementRef.current?.play().catch(playError => {
-                    console.warn("VideoPlayer (Nativo HLS): Error al intentar video.play():", playError);
-                });
-            });
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.error("HLS fatal network error encountered, try to recover");
+              hls.startLoad(); // Intentar reconectar
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.error("HLS fatal media error encountered, try to recover");
+              hls.recoverMediaError();
+              break;
+            default:
+              setError(`Error HLS (${data.type}): ${data.details || 'Detalles no disponibles'}`);
+              hls.destroy(); // Destruir en error fatal no recuperable
+              break;
+          }
         } else {
-            setError("HLS no es soportado en este navegador.");
+            // Errores no fatales, podrían ser solo advertencias o problemas menores
+             setError(`Advertencia HLS (${data.type}): ${data.details || 'Detalles no disponibles'}`);
         }
+        setIsBuffering(false); 
+      });
+      hls.on(Hls.Events.BUFFER_APPENDING, () => setIsBuffering(true));
+      hls.on(Hls.Events.FRAG_BUFFERED, () => setIsBuffering(false)); 
+      hls.on(Hls.Events.BUFFER_EOS, () => setIsBuffering(false));
+      hls.on(Hls.Events.BUFFER_FLUSHED, () => setIsBuffering(false));
+      hlsInstanceRef.current = hls;
+      return () => { if (hlsInstanceRef.current) hlsInstanceRef.current.destroy(); };
+    } else if (isHlsStream && hlsVideoElementRef.current) { 
+        if (hlsVideoElementRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+            hlsVideoElementRef.current.src = url;
+             const onLoadedMeta = () => {
+                setDuration(hlsVideoElementRef.current.duration);
+                handlePlayerReady();
+            };
+            hlsVideoElementRef.current.addEventListener('loadedmetadata', onLoadedMeta);
+            hlsVideoElementRef.current.addEventListener('waiting', () => setIsBuffering(true));
+            hlsVideoElementRef.current.addEventListener('playing', () => setIsBuffering(false));
+            hlsVideoElementRef.current.addEventListener('canplay', () => setIsBuffering(false));
+            return () => hlsVideoElementRef.current?.removeEventListener('loadedmetadata', onLoadedMeta);
+        } else { setError("HLS no es soportado."); setIsBuffering(false); }
     }
-  }, [isHlsStream, url]); // Este efecto se re-ejecuta si isHlsStream o url cambian
+  }, [isHlsStream, url, handlePlayerReady]);
 
-  if (!url) {
-    return <div className="p-4 text-center text-orange-400 bg-black rounded-lg">No se proporcionó URL para reproducir.</div>;
-  }
 
-  if (error) {
-    return (
-      <div className="p-3 mb-3 bg-red-800 text-white rounded shadow-md text-sm">
-        <strong>Error de Reproducción:</strong> {error}
-        <button 
-          onClick={() => setError(null)} // Simplemente limpia el error. El usuario puede reintentar o cambiar de fuente.
-          className="ml-3 mt-2 sm:mt-0 px-3 py-1 bg-red-900 hover:bg-red-700 rounded text-xs font-semibold"
-        >
-          OK
-        </button>
-      </div>
-    );
-  }
+  const handlePlayPause = useCallback(() => setPlaying(prev => !prev), []);
+  const handleVolumeChange = useCallback((e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    setMuted(newVolume === 0);
+  }, []);
+  const handleMuteToggle = useCallback(() => {
+    const newMuted = !muted;
+    setMuted(newMuted);
+    if (newMuted === false && volume === 0) setVolume(0.5);
+  }, [muted, volume]);
 
-  // Renderizar el reproductor apropiado
-  if (isHlsStream) {
-    // Para HLS, usamos un tag <video> controlado por HLS.js o nativo
-    return (
-      <video
-        ref={videoElementRef}
-        controls
-        playsInline
-        className="w-full max-h-[calc(100vh-160px)] min-h-[300px] bg-black rounded focus:outline-none"
-        autoPlay // El autoplay puede ser bloqueado por políticas del navegador
-      />
-    );
-  } else {
-    // Para otros formatos (MP4, MKV, YouTube, etc.), ReactPlayer
-    console.log("VideoPlayer: Usando ReactPlayer para URL (no HLS):", url);
-    return (
-      <div className='player-wrapper w-full aspect-video bg-black rounded'>
-        <ReactPlayer
-          className='react-player'
-          url={url}
-          playing={true} // Intenta autoplay; puede ser bloqueado.
-          controls={true}
-          width='100%'
-          height='100%'
-          onError={e => {
-            console.error('VideoPlayer: ReactPlayer Error:', e);
-            let errorMessage = "Error desconocido al reproducir con ReactPlayer.";
-            // Intentar obtener un mensaje más específico del error
-            if (typeof e === 'object' && e !== null) {
-                if(e.message) errorMessage = e.message; // Para errores de JS
-                else if (e.target && e.target.error && e.target.error.message) errorMessage = e.target.error.message; // Para errores de media element
-                else if (e.target && e.target.error) errorMessage = `Error de medio (código ${e.target.error.code})`;
-            } else if (typeof e === 'string') { // A veces ReactPlayer devuelve solo un string
-                errorMessage = e;
-            }
-            setError(`Error de ReactPlayer: ${errorMessage}`);
-          }}
-          config={{
-            file: {
-              attributes: {
-                controlsList: 'nodownload', // Opcional: deshabilita botón de descarga en algunos navegadores
-                crossOrigin: 'anonymous', // Puede ser necesario para algunas fuentes o tracks/subtítulos
-              },
-              // forceVideo: true, // Podría ayudar para algunos formatos si ReactPlayer duda
-            }
-          }}
+  const handleReactPlayerProgress = useCallback((state) => {
+    if (!seeking) setPlayedSeconds(state.playedSeconds);
+    setLoadedSeconds(state.loadedSeconds);
+    if (itemId && duration > 0) saveProgress(state.playedSeconds, duration);
+  }, [seeking, itemId, duration, saveProgress]);
+  
+  const handleHLSProgress = useCallback(() => {
+    if(hlsVideoElementRef.current && !seeking) {
+        setPlayedSeconds(hlsVideoElementRef.current.currentTime);
+        if (hlsVideoElementRef.current.buffered.length > 0) {
+            setLoadedSeconds(hlsVideoElementRef.current.buffered.end(hlsVideoElementRef.current.buffered.length - 1));
+        }
+        if (itemId && duration > 0) saveProgress(hlsVideoElementRef.current.currentTime, duration);
+    }
+  }, [seeking, itemId, duration, saveProgress]);
+
+  const handleSeekChange = useCallback((e) => {
+    const newPlayedSeconds = parseFloat(e.target.value);
+    setPlayedSeconds(newPlayedSeconds); 
+    if (playerRef.current) playerRef.current.seekTo(newPlayedSeconds, 'seconds');
+    else if (hlsVideoElementRef.current) hlsVideoElementRef.current.currentTime = newPlayedSeconds;
+  }, []);
+  const handleSeekMouseDown = useCallback(() => setSeeking(true), []);
+  const handleSeekMouseUp = useCallback(() => setSeeking(false), []);
+  
+  const handleTimeUpdate = useCallback((seconds) => { // Para HLS
+    if (!seeking) setPlayedSeconds(seconds);
+  }, [seeking]);
+
+  const handleFastForward = useCallback(() => {
+    const current = isHlsStream ? hlsVideoElementRef.current?.currentTime : playedSeconds;
+    const newTime = Math.min(current + 10, duration);
+    if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+    else if (hlsVideoElementRef.current) hlsVideoElementRef.current.currentTime = newTime;
+    setPlayedSeconds(newTime);
+  }, [playedSeconds, duration, isHlsStream]);
+
+  const handleRewind = useCallback(() => {
+    const current = isHlsStream ? hlsVideoElementRef.current?.currentTime : playedSeconds;
+    const newTime = Math.max(current - 10, 0);
+    if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+    else if (hlsVideoElementRef.current) hlsVideoElementRef.current.currentTime = newTime;
+    setPlayedSeconds(newTime);
+  }, [playedSeconds, isHlsStream]);
+
+  const toggleFullscreen = useCallback(() => {
+    const elem = playerWrapperRef.current;
+    if (!elem) return;
+    if (!document.fullscreenElement) {
+      elem.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const hideControls = useCallback(() => {
+    if (playing && !seeking) {
+      setShowControls(false);
+      if (isFullscreen && playerWrapperRef.current) {
+        playerWrapperRef.current.classList.add('player-fullscreen-hide-cursor');
+      }
+    }
+  }, [playing, seeking, isFullscreen]);
+
+  const showAndResetTimeout = useCallback(() => {
+    if (playerWrapperRef.current) {
+      playerWrapperRef.current.classList.remove('player-fullscreen-hide-cursor');
+    }
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    setShowControls(true);
+    controlsTimeoutRef.current = setTimeout(hideControls, 3000); // Ocultar después de 3s
+  }, [hideControls]);
+
+  useEffect(() => { 
+    showAndResetTimeout(); // Mostrar controles al montar y cada vez que cambie 'playing'
+    return () => { if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); };
+  }, [playing, showAndResetTimeout]);
+
+
+  if (!url) return <div className="flex items-center justify-center w-full aspect-video bg-black text-orange-400 rounded-lg">No se proporcionó URL.</div>;
+  if (error) return <div className="flex flex-col items-center justify-center w-full aspect-video bg-black text-red-400 p-4 rounded-lg"><strong>Error:</strong> {error} <button onClick={() => setError(null)} className="mt-2 px-3 py-1 bg-red-700 rounded text-xs">OK</button></div>;
+
+  const playedRatio = duration > 0 ? playedSeconds / duration : 0;
+  const loadedRatio = duration > 0 ? loadedSeconds / duration : 0;
+
+  return (
+    <div
+      ref={playerWrapperRef}
+      className="player-wrapper w-full aspect-video bg-black rounded-lg relative group select-none"
+      onMouseMove={showAndResetTimeout} 
+      onMouseLeave={() => { 
+        if (playing && !seeking) {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); 
+            controlsTimeoutRef.current = setTimeout(hideControls, 750); 
+        }
+      }}
+      onTouchStart={showAndResetTimeout} // Para dispositivos táctiles
+    >
+      {isHlsStream ? (
+        <video
+          ref={hlsVideoElementRef}
+          playsInline autoPlay
+          muted={muted}
+          onClick={handlePlayPause} // Clic en el video para play/pause
+          onPlay={() => {setPlaying(true); setIsBuffering(false); showAndResetTimeout();}}
+          onPause={() => {setPlaying(false); showAndResetTimeout();}} 
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => setIsBuffering(false)}
+          onCanPlay={() => setIsBuffering(false)} // Otra señal de que puede reproducir
+          onLoadedData={handlePlayerReady} 
+          onLoadedMetadata={(e) => setDuration(e.target.duration)}
+          onTimeUpdate={handleHLSProgress}
+          className="w-full h-full object-contain focus:outline-none" // object-contain para HLS
         />
+      ) : (
+        <ReactPlayer
+          ref={playerRef}
+          className="react-player absolute top-0 left-0 pointer-events-none" 
+          url={url}
+          playing={playing}
+          controls={false}
+          volume={volume}
+          muted={muted}
+          width="100%"
+          height="100%"
+          onReady={handlePlayerReady}
+          onProgress={handleReactPlayerProgress}
+          onDuration={setDuration}
+          onError={e => { console.error('ReactPlayer Error:', e); setError(`Error ReactPlayer`); setIsBuffering(false);}}
+          onPlay={() => {setPlaying(true); setIsBuffering(false); showAndResetTimeout();}}
+          onPause={() => {setPlaying(false); showAndResetTimeout();}}
+          onBuffer={() => setIsBuffering(true)}
+          onBufferEnd={() => setIsBuffering(false)}
+          config={{ file: { 
+            attributes: { controlsList: 'nodownload', crossOrigin: 'anonymous' },
+            forceVideo: true // Puede ayudar con algunos formatos
+          }}}
+        />
+      )}
+       {/* Capa invisible para capturar clics si ReactPlayer/video consume los clics */}
+       <div 
+            className="absolute inset-0 z-[5]" 
+            onClick={handlePlayPause} // Este es el que manejará el play/pause general
+        ></div>
+
+
+      {isBuffering && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-25 z-20 pointer-events-none">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-gray-400 border-t-white rounded-full animate-spin"></div>
+        </div>
+      )}
+
+      {/* Controles */}
+      <div
+        className={`absolute inset-x-0 bottom-0 px-2 pt-10 pb-2 sm:px-3 sm:pb-3 md:px-4 md:pb-4 
+                    bg-gradient-to-t from-black/80 via-black/40 to-transparent 
+                    transition-opacity duration-300 ease-out z-10
+                    ${showControls || !playing || seeking ? 'opacity-100' : 'opacity-0'}`}
+      >
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          {/* Barra de Progreso */}
+          <div className="w-full relative h-1.5 group/progress cursor-pointer mb-1 sm:mb-1.5" 
+               onMouseDown={handleSeekMouseDown} 
+               onTouchStart={handleSeekMouseDown} // Para táctil
+               onMouseUp={handleSeekMouseUp}
+               onTouchEnd={handleSeekMouseUp} // Para táctil
+          >
+            <input
+              type="range" min={0} max={duration || 1} step="any" value={playedSeconds}
+              onChange={handleSeekChange}
+              onTouchMove={(e) => handleSeekChange(e.target)} // Para táctil
+              className="w-full h-full absolute appearance-none bg-transparent z-20 cursor-pointer
+                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:opacity-0 group-hover/progress:[&::-webkit-slider-thumb]:opacity-100 active:[&::-webkit-slider-thumb]:opacity-100 transition-opacity
+                         [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-500 [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:opacity-0 group-hover/progress:[&::-moz-range-thumb]:opacity-100 active:[&::-moz-range-thumb]:opacity-100 transition-opacity"
+            />
+            <div className="w-full h-full absolute bg-white/20 rounded-full overflow-hidden"> {/* Track Base */}
+              <div className="h-full bg-white/30" style={{ width: `${loadedRatio * 100}%` }}></div> {/* Buffer de carga */}
+              <div className="h-full bg-red-600 absolute top-0 left-0" style={{ width: `${playedRatio * 100}%` }}></div> {/* Progreso principal */}
+            </div>
+             <div // Thumb visual (se mueve con el input range)
+                className="absolute h-3 w-3 bg-red-500 rounded-full -mt-[4.5px] pointer-events-none opacity-0 group-hover/progress:opacity-100 active:opacity-100 transition-opacity"
+                style={{ left: `calc(${playedRatio * 100}% - 6px)` }} 
+            ></div>
+          </div>
+
+          {/* Botones y Tiempo */}
+          <div className="flex items-center justify-between text-white text-[11px] sm:text-xs">
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
+              <button onClick={handlePlayPause} title={playing ? "Pausar" : "Reproducir"} className="p-1 hover:bg-white/10 rounded-full"><span className="sr-only">{playing ? "Pause" : "Play"}</span>{playing ? <PauseSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <PlaySolidIcon className="w-4 h-4 sm:w-5 sm:h-5" />}</button>
+              <button onClick={handleRewind} title="Retroceder 10s" className="p-1 hover:bg-white/10 rounded-full hidden sm:block"><span className="sr-only">Retroceder 10s</span><BackwardSolidIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
+              <button onClick={handleFastForward} title="Adelantar 10s" className="p-1 hover:bg-white/10 rounded-full hidden sm:block"><span className="sr-only">Adelantar 10s</span><ForwardSolidIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></button>
+              <button onClick={handleMuteToggle} title={muted || volume === 0 ? "Quitar Silencio" : "Silenciar"} className="p-1 hover:bg-white/10 rounded-full"><span className="sr-only">{muted || volume === 0 ? "Unmute" : "Mute"}</span>{muted || volume === 0 ? <SpeakerXMarkSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <SpeakerWaveSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" />}</button>
+              <div className="w-12 sm:w-16 md:w-20 group/volume flex items-center">
+                <input type="range" min="0" max="1" step="any" value={muted ? 0 : volume} onChange={handleVolumeChange} className="w-full h-1 accent-red-600 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500 [&::-moz-range-thumb]:h-2.5 [&::-moz-range-thumb]:w-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-500 [&::-moz-range-thumb]:border-none" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
+              <span className="tabular-nums">{formatTime(playedSeconds)} / {formatTime(duration)}</span>
+              <button onClick={toggleFullscreen} title={isFullscreen ? "Salir de Pantalla Completa" : "Pantalla Completa"} className="p-1 hover:bg-white/10 rounded-full"><span className="sr-only">{isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}</span>{isFullscreen ? <ArrowsPointingInSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" /> : <ArrowsPointingOutSolidIcon className="w-4 h-4 sm:w-5 sm:h-5" />}</button>
+            </div>
+          </div>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
 }
