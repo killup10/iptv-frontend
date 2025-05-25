@@ -2,26 +2,18 @@
   "name": "iptv-frontend",
   "private": true,
   "version": "1.0.0",
-  "description": "TeamG Play.",
-  "author": {
-    "name": "TeamG Store",
-    "email": "teamgstore10@gmail.com"
-  },
   "type": "module",
   "main": "electron.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "electron:dev": "concurrently --kill-others \"npm run dev\" \"wait-on -t 60000 http://localhost:5173 && echo 'Vite está listo, iniciando Electron...' && electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "build-electron": "electron-builder --config electron-builder.config.cjs"
+    "electron": "electron .",
+    "electron:prod": "npm run build && electron ."
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "axios": "^1.9.0",
-    "electron-is-dev": "^3.0.1",
     "hls.js": "^1.6.2",
     "lucide-react": "^0.507.0",
     "react": "^18.2.0",
@@ -37,57 +29,12 @@
     "@types/react-dom": "^18.0.11",
     "@vitejs/plugin-react-swc": "^3.8.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.1.2",
     "electron": "^36.2.1",
-    "electron-builder": "^26.0.12",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "vite": "^6.3.1",
-    "wait-on": "^8.0.3"
-  },
-  "build": {
-    "appId": "com.teamg.play.desktop",
-    "productName": "TeamG Play Desktop",
-    "files": [
-      "dist/**/*",
-      "electron.cjs",
-      "package.json",
-      "preload.cjs",
-      "node_modules/electron/dist/**"
-    ],
-    "extraResources": [
-      {
-        "from": "ffmpeg_custom/ffmpeg.dll",
-        "to": "ffmpeg_custom_packaged",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "public/vite.svg",
-        "to": "vite.svg"
-      }
-    ],
-    "afterPack": "./afterPackHook.cjs",
-    "directories": {
-      "buildResources": "assets_electron",
-      "output": "release_electron"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "assets_electron/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets_electron/icon.icns",
-      "category": "public.app-category.entertainment"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets_electron/icon.png"
-    }
+    "vite": "^6.3.1"
   }
 }

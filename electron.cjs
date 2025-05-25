@@ -1,11 +1,15 @@
 // electron.cjs
 const { app, BrowserWindow, session, shell } = require('electron');
 const path = require('node:path');
-const fs = require('node:fs');
+const fs = require('node:fs'); // <-- ASEGÚRATE DE QUE ESTA LÍNEA ESTÉ DESCOMENTADA
 
-let mainWindow; // Asegúrate de que mainWindow esté declarada si la usas globalmente
+let mainWindow;
 
-const isDev = !app.isPackaged; // Determina si está en desarrollo o producción
+// --- MODIFICACIÓN TEMPORAL PARA FORZAR MODO PRODUCCIÓN ---
+// const isDev = !app.isPackaged; // Comentamos la detección automática
+const isDev = false; // ¡FORZAMOS isDev a false para esta prueba!
+// --- FIN DE LA MODIFICACIÓN TEMPORAL ---
+
 const appVersion = app.getVersion();
 const finalUserAgentString = `TeamGDesktopApp/${appVersion}`;
 
@@ -13,48 +17,33 @@ function log(msg) {
   console.log(`[MainProcess] ${new Date().toISOString()}: ${msg}`);
 }
 
-// --- INICIO DE LA MODIFICACIÓN PARA FFmpeg ---
+// --- LÓGICA DE FFmpeg ---
 log('Configurando ruta para ffmpeg.dll...');
-
-// process.resourcesPath apunta a la carpeta 'resources' en producción.
-// En desarrollo, __dirname es la raíz del proyecto (iptv-frontend).
-// Asumimos que tu ffmpeg.dll original (antes de ser copiado por extraResources)
-// está en 'ffmpeg_custom/ffmpeg.dll' relativo a la raíz del proyecto.
-const ffmpegDirectoryName = 'ffmpeg_custom_packaged'; // El directorio 'to' de extraResources
+const ffmpegDirectoryName = 'ffmpeg_custom_packaged';
 const ffmpegFileName = 'ffmpeg.dll';
-
 let ffmpegPathUserProvided;
 
 if (isDev) {
-  // En desarrollo, podrías querer simular la estructura o apuntar al original.
-  // Para este ejemplo, apuntaremos a la fuente original que extraResources usaría.
-  // O, si tu hook afterPack ya lo reemplaza en el Electron de desarrollo,
-  // esta lógica de detección en dev podría ser menos crítica.
-  // Por simplicidad, aquí solo logueamos que en dev se usaría el ffmpeg de Electron (potencialmente reemplazado).
-  log(`  Modo Desarrollo: Se asume que FFmpeg (original o reemplazado por hook) está en la ruta de Electron.`);
-  // Si necesitas verificar el DLL original en desarrollo:
-  // ffmpegPathUserProvided = path.join(__dirname, 'ffmpeg_custom', ffmpegFileName);
+  log(`   Modo Desarrollo (FORZADO A NO SER): Se asume que FFmpeg está en la ruta de Electron.`);
 } else {
-  // En producción, process.resourcesPath es la carpeta 'resources' de la app.
+  // En producción (o cuando isDev es false), process.resourcesPath es la carpeta 'resources'
+  // Esta ruta es para cuando la app está empaquetada.
+  // Cuando corres `electron .` con `isDev = false`, `process.resourcesPath`
+  // apuntará a `node_modules/electron/dist/resources`.
   ffmpegPathUserProvided = path.join(process.resourcesPath, ffmpegDirectoryName, ffmpegFileName);
 }
 
-if (!isDev && ffmpegPathUserProvided) {
-  log(`  Modo Producción: Buscando ffmpeg.dll personalizado en: ${ffmpegPathUserProvided}`);
-  if (fs.existsSync(ffmpegPathUserProvided)) {
-    // Considera cuidadosamente si 'no-sandbox' es necesario y sus implicaciones de seguridad.
-    // A menudo, el reemplazo de ffmpeg.dll por el hook afterPack es suficiente para que Electron lo use.
-    // app.commandLine.appendSwitch('no-sandbox');
-    log(`  ✅ ffmpeg.dll personalizado encontrado en producción: ${ffmpegPathUserProvided}`);
-    // Aquí podrías hacer algo con esta ruta si tu aplicación la necesita directamente.
+if (!isDev && ffmpegPathUserProvided) { // Esta condición ahora será true
+  log(`   Modo Producción (FORZADO): Buscando ffmpeg.dll personalizado en: ${ffmpegPathUserProvided}`);
+  if (fs.existsSync(ffmpegPathUserProvided)) { // fs.existsSync ahora debería funcionar
+    log(`   ✅ ffmpeg.dll personalizado encontrado en: ${ffmpegPathUserProvided}`);
   } else {
-    log(`  ⚠️ No se encontró ffmpeg.dll personalizado en producción en: ${ffmpegPathUserProvided}`);
+    log(`   ⚠️ No se encontró ffmpeg.dll personalizado en: ${ffmpegPathUserProvided}. Electron usará su ffmpeg.dll por defecto (la que reemplazaste en node_modules/electron/dist si lo hiciste).`);
   }
 }
-// --- FIN DE LA MODIFICACIÓN PARA FFmpeg ---
+// --- FIN DE LA LÓGICA DE FFmpeg ---
 
 function createWindow() {
-  // En producción, __dirname es [RAÍZ_APP_EMPAQUETADA]/resources/app.asar/
   const preloadPath = path.join(__dirname, 'preload.cjs');
 
   mainWindow = new BrowserWindow({
@@ -68,29 +57,18 @@ function createWindow() {
     }
   });
 
-  // En producción, __dirname es [RAÍZ_APP_EMPAQUETADA]/resources/app.asar/
-  // Tu frontend (React/Vite) se compila en la carpeta 'dist'.
-  const prodIndexPath = path.join(__dirname, 'dist', 'index.html'); // Ruta: .../app.asar/dist/index.html
+  const prodIndexPath = path.join(__dirname, 'dist', 'index.html');
 
-  const startURL = isDev
-    ? 'http://localhost:5173' // Servidor de desarrollo de Vite
-    : `file://${prodIndexPath}`; // Carga el index.html desde la carpeta dist empaquetada
+  log(`Intentando cargar URL (MODO PRODUCCIÓN FORZADO): ${prodIndexPath}`);
 
-  log(`Intentando cargar URL: ${startURL}`);
-
-  if (isDev) {
-    mainWindow.loadURL(startURL).catch(err => log(`Error al cargar URL (dev): ${err}`));
-  } else {
-    mainWindow.loadFile(prodIndexPath).catch(err => log(`Error al cargar archivo (prod): ${err}`));
-  }
+  // La rama 'else' siempre se ejecutará ahora porque isDev = false
+  mainWindow.loadFile(prodIndexPath).catch(err => log(`Error al cargar archivo (prod - forzado): ${err.toString()}`));
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     log(`[ERROR AL CARGAR VENTANA] No se pudo cargar ${validatedURL}: ${errorDescription} (Código: ${errorCode})`);
   });
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
+  mainWindow.webContents.openDevTools();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http')) {
@@ -106,15 +84,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  log(`App lista. isDev = ${isDev}, Versión App: ${appVersion}`);
+  log(`App lista. isDev = ${isDev} (FORZADO), Versión App: ${appVersion}`);
 
-  // Configuración de cabeceras COOP/COEP (si las necesitas para SharedArrayBuffer, etc.)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Embedder-Policy': 'require-corp' // O 'credentialless' si es más apropiado
+        'Cross-Origin-Embedder-Policy': 'require-corp'
       }
     });
   });
@@ -137,9 +114,7 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (error) => {
   log(`[ERROR NO CAPTURADO] ${error.message}\n${error.stack}`);
   if (app && app.isReady()) {
-    const { dialog } = require('electron'); // require aquí para evitar errores si app no está lista
+    const { dialog } = require('electron');
     dialog.showErrorBox('Error inesperado en el proceso principal', `${error.name}: ${error.message}\n${error.stack}`);
   }
-  // Considera cerrar la aplicación aquí si el error es crítico
-  // process.exit(1);
 });

@@ -1,9 +1,10 @@
 // src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import AppLayout from './App.jsx'; // Renombramos App.jsx a AppLayout.jsx o lo dejamos como App.jsx si prefieres
+import AppLayout from './App.jsx';
 import './index.css';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+// Cambiamos createBrowserRouter por createHashRouter para Electron
+import { createHashRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 
 // Importar Páginas
@@ -12,32 +13,36 @@ import Login from './pages/Login.jsx';
 // import Register from './pages/Register.jsx'; // Si tienes registro
 import AdminPanel from './pages/AdminPanel.jsx';
 import Watch from './pages/Watch.jsx'; // Página de reproducción
-import LiveTVPage from './pages/LiveTVPage.jsx'; // Nueva página para TV
-import MoviesPage from './pages/MoviesPage.jsx'; // Nueva página para Películas
-import SeriesPage from './pages/SeriesPage.jsx'; // Nueva página para Series
-import ProtectedRoute from './components/ProtectedRoute.jsx'; // Asumiendo que tienes este componente
+import LiveTVPage from './pages/LiveTVPage.jsx';
+import MoviesPage from './pages/MoviesPage.jsx';
+import SeriesPage from './pages/SeriesPage.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+// import NotFoundPage from './pages/NotFoundPage.jsx'; // Descomenta si tienes una página 404 personalizada
 
-const router = createBrowserRouter([
+// Usamos createHashRouter en lugar de createBrowserRouter
+// Esto es más adecuado para aplicaciones Electron cargadas con file://
+// ya que no requiere configuración del lado del servidor para manejar rutas.
+const router = createHashRouter([
   {
-    path: "/",
-    element: <AppLayout />, // AppLayout es tu App.jsx actual que contiene Header, Footer y Outlet
+    path: "/", // En HashRouter, esto se traduce a la ruta base (ej. index.html#/)
+    element: <AppLayout />,
     children: [
-      { index: true, element: <Home /> }, // HomePage será pública y mostrará contenido destacado
+      { index: true, element: <Home /> },
       { path: "login", element: <Login /> },
       // { path: "register", element: <Register /> },
       {
         path: "admin",
         element: (
-          <ProtectedRoute adminOnly={true}> {/* Asumiendo que ProtectedRoute puede verificar roles */}
+          <ProtectedRoute adminOnly={true}>
             <AdminPanel />
           </ProtectedRoute>
         ),
       },
       {
-        path: "watch/:itemType/:itemId", // Ruta más descriptiva para la reproducción
+        path: "watch/:itemType/:itemId",
         element: (
           <ProtectedRoute>
-            <Watch/>
+            <Watch />
           </ProtectedRoute>
         ),
       },
@@ -65,10 +70,13 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // Podrías añadir una ruta catch-all para 404 si quieres
-      // { path: "*", element: <NotFoundPage /> },
+      // Ruta catch-all para 404 (opcional, pero recomendada)
+      // Asegúrate de que esta sea la última ruta dentro de los children de AppLayout
+      // { path: "*", element: <NotFoundPage /> }, // Descomenta si tienes NotFoundPage
     ],
   },
+  // Puedes tener otras rutas de nivel superior aquí si es necesario,
+  // aunque generalmente con AppLayout como raíz es suficiente.
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
