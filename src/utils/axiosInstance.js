@@ -1,11 +1,19 @@
 // src/utils/axiosInstance.js
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const axiosInstance = axios.create({
-  baseURL: API_BASE_URL, // Tu URL base del backend
+  baseURL: API_BASE_URL,
+  timeout: 300000, // Aumentado a 5 minutos para manejar operaciones largas
+  maxContentLength: 50 * 1024 * 1024, // 50MB límite de respuesta
+  maxBodyLength: 50 * 1024 * 1024, // 50MB límite de petición
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
+
+console.log('axiosInstance: Configurado con baseURL:', API_BASE_URL);
 
 // --- Interceptor de Petición (Request) ---
 // Se ejecuta ANTES de que cada petición sea enviada.
@@ -19,6 +27,13 @@ axiosInstance.interceptors.request.use(
     } else {
       console.log("axiosInstance: No hay token en localStorage para añadir a la petición.");
     }
+    
+    // Ajustar timeout para peticiones específicas que pueden tomar más tiempo
+    if (config.url?.includes('/upload-text') || config.url?.includes('/upload-m3u')) {
+      config.timeout = 600000; // 10 minutos para uploads
+      console.log("axiosInstance: Timeout extendido a 10 minutos para carga de archivos.");
+    }
+    
     return config; // Continúa con la petición
   },
   (error) => {
@@ -65,6 +80,10 @@ axiosInstance.interceptors.response.use(
         // ya que la recarga de la página y la limpieza del localStorage
         // harán que AuthContext se inicialice sin usuario.
       }
+    } else if (error.code === 'ECONNABORTED') {
+      // Manejar específicamente errores de timeout
+      console.error("axiosInstance: La petición excedió el tiempo límite. Puede que necesites aumentar el timeout para esta operación.");
+      error.message = 'La operación tardó demasiado tiempo. Por favor, intenta de nuevo o contacta al soporte si el problema persiste.';
     } else if (error.request) {
       // La petición se hizo pero no se recibió respuesta (ej. problema de red)
       console.error("axiosInstance: No se recibió respuesta del servidor:", error.request);

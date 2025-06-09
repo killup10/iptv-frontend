@@ -3,22 +3,26 @@ directories:
   buildResources: assets_electron
 appId: com.teamg.play.desktop
 productName: TeamG Play Desktop
+asar: true
+asarUnpack:
+  - mpv/**
 files:
   - filter:
       - dist/**/*
       - electron.cjs
-      - package.json
       - preload.cjs
+      - package.json
 extraResources:
-  - from: ffmpeg_custom/ffmpeg.dll
-    to: ffmpeg_custom_packaged
+  - from: mpv
+    to: mpv
     filter:
       - '**/*'
-  - from: public/vite.svg
-    to: vite.svg
 afterPack: ./afterPackHook.cjs
 win:
-  target: nsis
+  target:
+    - target: nsis
+      arch:
+        - x64
   icon: assets_electron/icon.ico
 mac:
   target: dmg
@@ -27,4 +31,10 @@ mac:
 linux:
   target: AppImage
   icon: assets_electron/icon.png
-electronVersion: 36.2.1
+  category: AudioVideo;Player;Video;
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+electronVersion: 36.4.0

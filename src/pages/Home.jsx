@@ -11,6 +11,7 @@ import {
   fetchUserSeries as fetchAllSeries
 } from '../utils/api.js';
 import TrailerModal from '../components/TrailerModal.jsx';
+import { videoProgressService } from '../services/videoProgress.js';
 
 export function Home() {
   const { user } = useAuth();
@@ -91,51 +92,21 @@ export function Home() {
   }, [user]);
 
   useEffect(() => {
-    if (loading || allContentMap.size === 0) {
-      // console.log('[Home.jsx] Saltando useEffect de Continuar Viendo: loading o allContentMap vacío.');
-      return;
-    }
-    console.log('[Home.jsx] Procesando "Continuar Viendo"...');
-    try {
-      const progressDataString = localStorage.getItem('videoProgress');
-      // console.log('[Home.jsx] videoProgress desde localStorage (string):', progressDataString);
-      const progressData = JSON.parse(progressDataString || '{}');
-      // console.log('[Home.jsx] videoProgress parseado:', progressData);
-
-      const itemsWithProgress = Object.entries(progressData)
-        .map(([itemId, data]) => {
-          // console.log(`[Home.jsx] Buscando en allContentMap por itemId: ${itemId}`);
-          const fullItemDetails = allContentMap.get(itemId);
-          // console.log(`[Home.jsx] fullItemDetails para ${itemId}:`, fullItemDetails ? JSON.parse(JSON.stringify(fullItemDetails)) : 'No encontrado');
-          // console.log(`[Home.jsx] Datos de progreso para ${itemId}:`, data);
-
-          if (fullItemDetails && data.duration > 0 && data.time < data.duration - 15) {
-            const hydratedItem = {
-              ...fullItemDetails,
-              id: itemId,
-              _id: itemId,
-              progressTime: data.time,
-              duration: data.duration,
-              lastWatched: data.lastWatched,
-              progressPercent: (data.time / data.duration) * 100,
-            };
-            // console.log(`[Home.jsx] Item hidratado para Continuar Viendo (${itemId}):`, JSON.parse(JSON.stringify(hydratedItem)));
-            return hydratedItem;
-          }
-          // console.log(`[Home.jsx] Item ${itemId} filtrado o no encontrado para Continuar Viendo.`);
-          return null;
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.lastWatched - a.lastWatched)
-        .slice(0, 10);
+    async function loadContinueWatching() {
+      if (!user || loading) return;
       
-      console.log('[Home.jsx] Items finales para "Continuar Viendo":', JSON.parse(JSON.stringify(itemsWithProgress)));
-      setContinueWatchingItems(itemsWithProgress);
-    } catch (e) {
-      console.error("[Home.jsx] Error procesando 'Continuar Viendo':", e);
-      setContinueWatchingItems([]);
+      try {
+        const items = await videoProgressService.getContinueWatching();
+        console.log('[Home.jsx] Items de "Continuar Viendo" cargados:', items);
+        setContinueWatchingItems(items);
+      } catch (error) {
+        console.error("[Home.jsx] Error cargando 'Continuar Viendo':", error);
+        setContinueWatchingItems([]);
+      }
     }
-  }, [loading, allContentMap]);
+
+    loadContinueWatching();
+  }, [user, loading]);
 
   const handleItemClick = (item, itemTypeFromCarousel) => {
     // LOG PROFUNDO DEL ITEM AL HACER CLIC
@@ -204,7 +175,7 @@ export function Home() {
               title="Continuar Viendo"
               items={continueWatchingItems}
               onItemClick={(item) => handleItemClick(item, item.itemType || 'movie')} // Asegurar un itemType si item.itemType es undefined
-              itemType="movie" 
+              itemType="movie"
             />
           )}
           {/* Resto de los carruseles (Destacados, etc.) */}

@@ -9,6 +9,10 @@ export default function NavBar() {
         <Link to="/tv" className="text-[#e5e5e5] hover:text-white">TV en Vivo</Link>
         <Link to="/movies" className="text-[#e5e5e5] hover:text-white">Películas</Link>
         <Link to="/series" className="text-[#e5e5e5] hover:text-white">Series</Link>
+        <Link to="/animes" className="text-[#e5e5e5] hover:text-white">Animes</Link>
+        <Link to="/doramas" className="text-[#e5e5e5] hover:text-white">Doramas</Link>
+        <Link to="/novelas" className="text-[#e5e5e5] hover:text-white">Novelas</Link>
+        <Link to="/documentales" className="text-[#e5e5e5] hover:text-white">Documentales</Link>
       </div>
     </nav>
   );

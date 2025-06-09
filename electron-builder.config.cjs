@@ -1,32 +1,37 @@
-// electron-builder.config.js
+// electron-builder.config.cjs
+/** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: "com.teamg.play.desktop",
   productName: "TeamG Play Desktop",
-  files: [
-    "dist/**/*",
-    "electron.cjs",
-    "package.json",
-    "preload.cjs"
-
+  asar: true,
+  asarUnpack: [
+    "mpv/**"
   ],
-  extraResources: [
-    {
-      from: "ffmpeg_custom/ffmpeg.dll",
-      to: "ffmpeg_custom_packaged",
-      filter: ["**/*"]
-    },
-    {
-      from: "public/vite.svg",
-      to: "vite.svg"
-    }
-  ],
-  afterPack: "./afterPackHook.cjs",
   directories: {
     buildResources: "assets_electron",
     output: "release_electron"
   },
+  files: [
+    "dist/**/*",
+    "electron.cjs",
+    "preload.cjs",
+    "package.json"
+  ],
+  extraResources: [
+    {
+      from: "mpv",
+      to: "mpv",
+      filter: ["**/*"]
+    }
+  ],
+  afterPack: "./afterPackHook.cjs",
   win: {
-    target: "nsis",
+    target: [
+      {
+        target: "nsis",
+        arch: ["x64"]
+      }
+    ],
     icon: "assets_electron/icon.ico"
   },
   mac: {
@@ -36,6 +41,13 @@ module.exports = {
   },
   linux: {
     target: "AppImage",
-    icon: "assets_electron/icon.png"
+    icon: "assets_electron/icon.png",
+    category: "AudioVideo;Player;Video;"
+  },
+  nsis: {
+    oneClick: false,
+    perMachine: false,
+    allowElevation: true,
+    allowToChangeInstallationDirectory: true
   }
 };

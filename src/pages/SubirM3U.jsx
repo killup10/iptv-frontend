@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useAuth } from "../context/AuthContext"; // Asumiendo que usas esto para el token
+import { useAuth } from "../context/AuthContext";
 
 function SubirM3U() {
   const [file, setFile] = useState(null);
-  const [uploadedFileName, setUploadedFileName] = useState(null); // Para guardar el nombre del archivo subido
+  const [section, setSection] = useState(""); // Nueva variable para la sección
+  const [uploadedFileName, setUploadedFileName] = useState(null);
   const [status, setStatus] = useState("");
   const [processingStatus, setProcessingStatus] = useState("");
-  const [m3uFilesList, setM3uFilesList] = useState([]); // Para listar archivos M3U
+  const [m3uFilesList, setM3uFilesList] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingUpload, setIsLoadingUpload] = useState(false);
   const [isLoadingProcess, setIsLoadingProcess] = useState(false);
 
-
-  const { user } = useAuth() || {}; // Obtener el usuario para el token
-  const token = user?.token || localStorage.getItem("token"); // Obtener token del contexto o localStorage
-
+  const { user } = useAuth() || {};
+  const token = user?.token || localStorage.getItem("token");
   const API_URL = import.meta.env.VITE_API_URL || "https://iptv-backend-w6hf.onrender.com";
 
-  // Función para cargar la lista de archivos M3U subidos
   const fetchM3UFiles = async () => {
     if (!token) return;
     setIsLoadingList(true);
@@ -26,7 +24,7 @@ function SubirM3U() {
       const res = await axios.get(`${API_URL}/api/m3u/list`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setM3uFilesList(res.data.files || []); // Asumiendo que la respuesta es { files: [...] }
+      setM3uFilesList(res.data.files || []);
     } catch (error) {
       console.error("Error al cargar lista de M3U:", error);
       setStatus("❌ Error al cargar lista de archivos M3U");
@@ -37,11 +35,11 @@ function SubirM3U() {
 
   useEffect(() => {
     fetchM3UFiles();
-  }, [token]); // Recargar si el token cambia
+  }, [token]);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
-    setUploadedFileName(null); // Resetear al cambiar de archivo
+    setUploadedFileName(null);
     setStatus("");
     setProcessingStatus("");
   };
@@ -49,10 +47,12 @@ function SubirM3U() {
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!file) return setStatus("Selecciona un archivo .m3u");
+    if (!section) return setStatus("Selecciona una sección para el contenido");
     if (!token) return setStatus("❌ No autenticado. Por favor, inicia sesión.");
 
     const formData = new FormData();
-    formData.append("m3uFile", file); // El backend espera 'm3uFile' según m3u.controller.js
+    formData.append("m3uFile", file);
+    formData.append("section", section); // Añadir la sección al formulario
 
     setIsLoadingUpload(true);
     setStatus("Subiendo archivo...");
@@ -61,7 +61,7 @@ function SubirM3U() {
 
     try {
       const res = await axios.post(
-        `${API_URL}/api/m3u/upload`, // Endpoint correcto para subida de M3U
+        `${API_URL}/api/m3u/upload`,
         formData,
         {
           headers: {
@@ -70,10 +70,9 @@ function SubirM3U() {
           },
         }
       );
-      // El backend /api/m3u/upload devuelve { id, filename, createdAt }
       setUploadedFileName(res.data.filename);
-      setStatus(`✅ Archivo "${res.data.filename}" subido correctamente.`);
-      fetchM3UFiles(); // Actualizar la lista después de subir
+      setStatus(`✅ Archivo "${res.data.filename}" subido correctamente en la sección ${section}.`);
+      fetchM3UFiles();
     } catch (error) {
       setStatus("❌ Error al subir archivo M3U.");
       console.error("Error en handleUploadSubmit:", error.response ? error.response.data : error.message);
@@ -96,9 +95,8 @@ function SubirM3U() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      // El backend /api/m3u/process/:filename devuelve { message, channelsAdded }
       setProcessingStatus(`✅ "${filenameToProcess}" procesado: ${res.data.message}. Canales añadidos: ${res.data.channelsAdded || 0}.`);
-      setUploadedFileName(null); // Limpiar para permitir nueva subida/procesamiento
+      setUploadedFileName(null);
     } catch (error) {
       setProcessingStatus(`❌ Error al procesar "${filenameToProcess}".`);
       console.error("Error en handleProcessM3U:", error.response ? error.response.data : error.message);
@@ -115,23 +113,36 @@ function SubirM3U() {
         <div className="bg-gray-800 p-6 rounded-lg shadow-xl mb-8">
           <h3 className="text-xl font-semibold mb-4">Subir Nuevo Archivo M3U</h3>
           <form onSubmit={handleUploadSubmit} className="flex flex-col gap-4">
+            {/* Selector de sección */}
+            <select
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              className="bg-zinc-700 text-white p-3 rounded border border-zinc-600"
+              required
+            >
+              <option value="">Selecciona una sección</option>
+              <option value="movies">Películas</option>
+              <option value="series">Series</option>
+              <option value="kids">ZONA KIDS</option>
+              <option value="tv">TV en vivo</option>
+            </select>
+
             <input
               type="file"
-              accept=".m3u,.m3u8" // Aceptar ambos
+              accept=".m3u,.m3u8"
               onChange={handleFileChange}
               className="bg-zinc-700 text-white p-3 rounded border border-zinc-600 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-500 file:text-white hover:file:bg-red-600"
             />
             <button 
               type="submit" 
               className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-semibold transition duration-150 ease-in-out disabled:opacity-50"
-              disabled={isLoadingUpload || !file}
+              disabled={isLoadingUpload || !file || !section}
             >
               {isLoadingUpload ? "Subiendo..." : "Subir Archivo"}
             </button>
           </form>
           {status && <p className={`mt-4 text-sm ${status.startsWith("❌") ? 'text-red-400' : 'text-green-400'}`}>{status}</p>}
 
-          {/* Botón para procesar el archivo recién subido */}
           {uploadedFileName && !isLoadingUpload && (
             <div className="mt-4">
               <button
@@ -139,7 +150,7 @@ function SubirM3U() {
                 className="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-semibold transition duration-150 ease-in-out disabled:opacity-50"
                 disabled={isLoadingProcess}
               >
-                {isLoadingProcess ? `Procesando ${uploadedFileName}...` : `Procesar Canales de "${uploadedFileName}"`}
+                {isLoadingProcess ? `Procesando ${uploadedFileName}...` : `Procesar Contenido de "${uploadedFileName}"`}
               </button>
             </div>
           )}
@@ -153,13 +164,16 @@ function SubirM3U() {
               <ul className="space-y-3">
                 {m3uFilesList.map((m3u) => (
                   <li key={m3u._id || m3u.id || m3u.filename} className="flex justify-between items-center bg-zinc-700 p-3 rounded">
-                    <span className="text-gray-300">{m3u.filename}</span>
+                    <span className="text-gray-300">
+                      {m3u.filename}
+                      {m3u.section && <span className="ml-2 text-xs bg-red-500 px-2 py-1 rounded">{m3u.section}</span>}
+                    </span>
                     <button
                       onClick={() => handleProcessM3U(m3u.filename)}
                       className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm font-semibold transition duration-150 ease-in-out disabled:opacity-50"
-                      disabled={isLoadingProcess && uploadedFileName === m3u.filename} // Deshabilitar solo si está procesando este archivo
+                      disabled={isLoadingProcess && uploadedFileName === m3u.filename}
                     >
-                       {isLoadingProcess && uploadedFileName === m3u.filename ? "Procesando..." : "Procesar"}
+                      {isLoadingProcess && uploadedFileName === m3u.filename ? "Procesando..." : "Procesar"}
                     </button>
                   </li>
                 ))}

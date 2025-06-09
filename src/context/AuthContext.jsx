@@ -79,13 +79,25 @@ export function AuthProvider({ children }) {
     return Promise.resolve(userForState); // Devuelve el usuario para posible encadenamiento
   };
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    setUser(null);
-    console.log("AuthContext: Usuario deslogueado.");
-    // Opcional: Redirigir al login
-    // window.location.href = '/login'; 
+  const logout = async (allDevices = false) => {
+    try {
+      // Importar dinámicamente para evitar dependencias circulares
+      const { logout: logoutService } = await import('../utils/AuthService.js');
+      await logoutService(allDevices);
+      
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("deviceId");
+      setUser(null);
+      console.log("AuthContext: Usuario deslogueado" + (allDevices ? " de todos los dispositivos." : "."));
+    } catch (error) {
+      console.error("AuthContext: Error al cerrar sesión:", error);
+      // Aún así, limpiar el estado local
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("deviceId");
+      setUser(null);
+    }
   };
 
   const contextValue = {

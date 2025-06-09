@@ -2,6 +2,10 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
+import Animes from "./pages/Animes.jsx";
+import Documentales from "./pages/Documentales.jsx";
+import Doramas from "./pages/Doramas.jsx";
+import Novelas from "./pages/Novelas.jsx";
 
 function App() {
   console.log('[App.jsx] Renderizando AppLayout (App.jsx)...'); // LOG AÑADIDO
@@ -82,6 +86,10 @@ function App() {
                   <Link to="/tv" className="text-gray-300 hover:text-white transition">TV en Vivo</Link>
                   <Link to="/movies" className="text-gray-300 hover:text-white transition">Películas</Link>
                   <Link to="/series" className="text-gray-300 hover:text-white transition">Series</Link>
+                  <Link to="/animes" className="text-gray-300 hover:text-white transition">Animes</Link>
+                  <Link to="/doramas" className="text-gray-300 hover:text-white transition">Doramas</Link>
+                  <Link to="/novelas" className="text-gray-300 hover:text-white transition">Novelas</Link>
+                  <Link to="/documentales" className="text-gray-300 hover:text-white transition">Documentales</Link>
                 </nav>
               )}
             </div>

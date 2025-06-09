@@ -66,10 +66,40 @@ export async function fetchUserSeries() {
   console.log(`API (fetchUserSeries - axios): GET ${relativePath} con params:`, params);
   try {
     const response = await axiosInstance.get(relativePath, { params });
-    return response.data || [];
+    // Asegurarse de que la subcategoría esté incluida en los datos
+    const series = response.data || [];
+    console.log('Series cargadas:', series);
+    return series.map(serie => ({
+      ...serie,
+      subcategoria: serie.subcategoria || "Netflix" // Valor por defecto si no tiene subcategoría
+    }));
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al obtener series.";
     console.error(`API Error (fetchUserSeries - axios): ${errorMsg}`, error.response?.data);
+    throw new Error(errorMsg);
+  }
+}
+
+export async function fetchVideoById(id) {
+  if (!id) {
+    console.error('fetchVideoById: ID no proporcionado');
+    throw new Error('ID de video no proporcionado');
+  }
+  
+  const relativePath = `/api/videos/${id}`;
+  console.log(`API (fetchVideoById - axios): GET ${relativePath}`);
+  
+  try {
+    const response = await axiosInstance.get(relativePath);
+    console.log('fetchVideoById response:', response.data);
+    return response.data;
+  } catch (error) {
+    const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Error al obtener video por ID.";
+    console.error(`API Error (fetchVideoById - axios): ${errorMsg}`, {
+      error: error.response?.data,
+      status: error.response?.status,
+      url: relativePath
+    });
     throw new Error(errorMsg);
   }
 }
@@ -226,10 +256,15 @@ export async function fetchAdminVideos() {
 }
 
 export async function createAdminVideo(videoData) {
-  const relativePath = "/api/videos/upload-link"; // Corregido para apuntar a la ruta de creación de VOD
+  const relativePath = "/api/videos";
   console.log(`API (createAdminVideo - axios): POST ${relativePath} con data:`, videoData);
   try {
-    const response = await axiosInstance.post(relativePath, videoData);
+    // Asegurar que subcategoria se envíe si existe
+    const payload = { ...videoData };
+    if (videoData.subcategoria) {
+      payload.subcategoria = videoData.subcategoria;
+    }
+    const response = await axiosInstance.post(relativePath, payload);
     return response.data;
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Admin: Error al crear VOD.";

@@ -2,24 +2,20 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-// Importa la función 'login' desde tu AuthService unificado
 import { login as authServiceLogin } from "../utils/AuthService.js";
+import ErrorBoundary from "../components/ErrorBoundary";
 
-export function Login() {
-  // Renombramos 'login' de AuthContext para evitar colisión de nombres
+// Componente interno que maneja la lógica de login
+function LoginForm() {
   const { login: loginContexto } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // 'from' es la ruta a la que el usuario intentaba acceder antes de ser redirigido a login
-  const from = location.state?.from?.pathname || "/"; // Asegúrate que location.state.from es un objeto con pathname
+  const from = location.state?.from?.pathname || "/";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  // La variable de entorno VITE_API_URL ahora se usa directamente dentro de AuthService.js
-  // por lo que no es necesario definir baseUrl aquí.
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,25 +30,14 @@ export function Login() {
 
     try {
       console.log(`Login.jsx: Llamando a authServiceLogin para el usuario: ${username}`);
-      // Llama a la función login de tu servicio de autenticación.
-      // authServiceLogin ya maneja deviceId y la URL completa de la API.
       const backendResponse = await authServiceLogin(username, password);
-
-      // Se espera que backendResponse sea un objeto como:
-      // { token: "EL_TOKEN", user: { username: "...", role: "...", plan: "..." } }
-      // Esta es la estructura que la función login de tu AuthContext espera.
       console.log("Login.jsx: Datos recibidos del backend para AuthContext:", backendResponse);
-      loginContexto(backendResponse); // Llama a la función login del AuthContext
-
+      await loginContexto(backendResponse);
       console.log("Login.jsx: Login exitoso, redirigiendo a:", from);
       navigate(from, { replace: true });
-
     } catch (err) {
       console.error("Login.jsx: Error durante el proceso de login:", err);
-      // 'err' aquí será el error lanzado por AuthService (que a su vez puede ser de axios)
-      // err.error (si el backend devuelve un objeto {error: 'mensaje'}) o err.message
-      const errorMessage = err.error || err.message || "Ocurrió un error desconocido durante el inicio de sesión.";
-      setError(errorMessage);
+      setError(err.message || "Ocurrió un error desconocido durante el inicio de sesión.");
     } finally {
       setIsLoading(false);
     }
@@ -60,17 +45,14 @@ export function Login() {
 
   return (
     <div className="min-h-screen relative">
-      {/* Fondo con imagen */}
       <div
         className="absolute inset-0 bg-cover bg-center filter brightness-50 blur-sm"
-        style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }} // Asegúrate que esta imagen exista en tu carpeta public/
+        style={{ backgroundImage: "url('/bg-login-placeholder.jpg')" }}
       ></div>
 
-      {/* Contenido del formulario */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
         <div className="w-full max-w-sm bg-zinc-900/90 p-8 rounded-lg shadow-xl">
           <div className="flex justify-center mb-6">
-            {/* Puedes poner tu logo aquí si tienes uno */}
             <span className="text-white font-bold text-3xl">
               <span className="text-red-600">T</span>eamG Play
             </span>
@@ -134,22 +116,19 @@ export function Login() {
               )}
             </button>
           </form>
-          {/*
-          <p className="mt-6 text-center text-sm text-gray-400">
-            ¿No tienes cuenta?{" "}
-            <Link to="/register" className="font-medium text-red-500 hover:text-red-400 hover:underline">
-              Regístrate aquí
-            </Link>
-          </p>
-          */}
         </div>
       </div>
     </div>
-  ); // Fin del return del componente
-} // <--- ESTA ES LA LLAVE DE CIERRE DE LA FUNCIÓN DEL COMPONENTE Login
+  );
+}
 
-// No olvides la exportación por defecto si es tu forma de exportar principal para esta página.
-// Si ya usas 'export function Login()', esta línea de abajo podría no ser estrictamente necesaria
-// si en tus rutas importas { Login } from './pages/Login.jsx'.
-// Sin embargo, es común tenerla.
+// Componente principal que envuelve LoginForm con ErrorBoundary
+export function Login() {
+  return (
+    <ErrorBoundary>
+      <LoginForm />
+    </ErrorBoundary>
+  );
+}
+
 export default Login;

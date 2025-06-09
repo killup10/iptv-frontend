@@ -36,12 +36,12 @@ export default function Card({ item, onClick, itemType = 'item', onPlayTrailer, 
     console.log(`Añadir "${item.name || item.title}" a Mi Lista (pendiente)`);
   };
 
-  const displayThumbnail = item.thumbnail || item.logo || '/img/placeholder-thumbnail.png';
+  const displayThumbnail = item.thumbnail || item.logo || item.customThumbnail || item.tmdbThumbnail || '/img/placeholder-thumbnail.png';
   const showDetailedOverlay = isHovered && (itemType === 'movie' || itemType === 'serie');
 
   return (
     <div
-      className="flex-shrink-0 w-40 sm:w-44 md:w-48 lg:w-52 xl:w-56 cursor-pointer group relative"
+      className="flex-shrink-0 w-full cursor-pointer group relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handlePlayPrincipal}

@@ -1,109 +1,109 @@
 // electron.cjs
-const { app, BrowserWindow, session, shell } = require('electron');
-const path = require('node:path');
-const fs = require('node:fs'); // <-- ASEGÚRATE DE QUE ESTA LÍNEA ESTÉ DESCOMENTADA
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
 
-let mainWindow;
+let mainWindow = null;
+let mpvProcess = null;
+const isDev = process.env.NODE_ENV === 'development';
 
-// --- MODIFICACIÓN TEMPORAL PARA FORZAR MODO PRODUCCIÓN ---
-// const isDev = !app.isPackaged; // Comentamos la detección automática
-const isDev = false; // ¡FORZAMOS isDev a false para esta prueba!
-// --- FIN DE LA MODIFICACIÓN TEMPORAL ---
-
-const appVersion = app.getVersion();
-const finalUserAgentString = `TeamGDesktopApp/${appVersion}`;
-
-function log(msg) {
-  console.log(`[MainProcess] ${new Date().toISOString()}: ${msg}`);
-}
-
-// --- LÓGICA DE FFmpeg ---
-log('Configurando ruta para ffmpeg.dll...');
-const ffmpegDirectoryName = 'ffmpeg_custom_packaged';
-const ffmpegFileName = 'ffmpeg.dll';
-let ffmpegPathUserProvided;
-
-if (isDev) {
-  log(`   Modo Desarrollo (FORZADO A NO SER): Se asume que FFmpeg está en la ruta de Electron.`);
-} else {
-  // En producción (o cuando isDev es false), process.resourcesPath es la carpeta 'resources'
-  // Esta ruta es para cuando la app está empaquetada.
-  // Cuando corres `electron .` con `isDev = false`, `process.resourcesPath`
-  // apuntará a `node_modules/electron/dist/resources`.
-  ffmpegPathUserProvided = path.join(process.resourcesPath, ffmpegDirectoryName, ffmpegFileName);
-}
-
-if (!isDev && ffmpegPathUserProvided) { // Esta condición ahora será true
-  log(`   Modo Producción (FORZADO): Buscando ffmpeg.dll personalizado en: ${ffmpegPathUserProvided}`);
-  if (fs.existsSync(ffmpegPathUserProvided)) { // fs.existsSync ahora debería funcionar
-    log(`   ✅ ffmpeg.dll personalizado encontrado en: ${ffmpegPathUserProvided}`);
-  } else {
-    log(`   ⚠️ No se encontró ffmpeg.dll personalizado en: ${ffmpegPathUserProvided}. Electron usará su ffmpeg.dll por defecto (la que reemplazaste en node_modules/electron/dist si lo hiciste).`);
-  }
-}
-// --- FIN DE LA LÓGICA DE FFmpeg ---
-
-function createWindow() {
-  const preloadPath = path.join(__dirname, 'preload.cjs');
-
+function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
-    height: 720,
+    height: 800,
     webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: preloadPath,
-      userAgent: finalUserAgentString,
+      contextIsolation: true, 
+      nodeIntegration: false, 
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
+    show: false
+  });
+
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  }
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  // Manejar redimensionado de la ventana principal
+  let resizeTimeout = null;
+  mainWindow.on('resize', () => {
+    if (mpvProcess) {
+      // Debounce para evitar muchas actualizaciones
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      resizeTimeout = setTimeout(() => {
+        try {
+          const bounds = mainWindow.getBounds();
+          const nircmd = path.join(isDev ? __dirname : process.resourcesPath, 'nircmd', 'nircmd.exe');
+          if (require('fs').existsSync(nircmd)) {
+            spawn(nircmd, ['win', 'setsize', 'title', 'TeamG Play', bounds.width.toString(), bounds.height.toString()]);
+          }
+        } catch (err) {
+          console.error('[Window] Error al redimensionar MPV:', err);
+        }
+      }, 100);
     }
   });
 
-  const prodIndexPath = path.join(__dirname, 'dist', 'index.html');
-
-  log(`Intentando cargar URL (MODO PRODUCCIÓN FORZADO): ${prodIndexPath}`);
-
-  // La rama 'else' siempre se ejecutará ahora porque isDev = false
-  mainWindow.loadFile(prodIndexPath).catch(err => log(`Error al cargar archivo (prod - forzado): ${err.toString()}`));
-
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    log(`[ERROR AL CARGAR VENTANA] No se pudo cargar ${validatedURL}: ${errorDescription} (Código: ${errorCode})`);
+  // Manejar minimizado/restaurado de la ventana principal
+  mainWindow.on('minimize', () => {
+    if (mpvProcess) {
+      try {
+        // Minimizar MPV usando comando nircmd
+        const nircmd = path.join(isDev ? __dirname : process.resourcesPath, 'nircmd', 'nircmd.exe');
+        if (require('fs').existsSync(nircmd)) {
+          spawn(nircmd, ['win', 'min', 'title', 'TeamG Play']);
+        } else {
+          console.warn('[Window] nircmd.exe no encontrado para minimizar MPV');
+        }
+      } catch (err) {
+        console.error('[Window] Error al minimizar MPV:', err);
+      }
+    }
   });
 
-  mainWindow.webContents.openDevTools();
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http')) {
-      shell.openExternal(url);
+  mainWindow.on('restore', () => {
+    if (mpvProcess) {
+      try {
+        // Restaurar MPV usando comando nircmd
+        const nircmd = path.join(isDev ? __dirname : process.resourcesPath, 'nircmd', 'nircmd.exe');
+        if (require('fs').existsSync(nircmd)) {
+          spawn(nircmd, ['win', 'normal', 'title', 'TeamG Play']);
+        } else {
+          console.warn('[Window] nircmd.exe no encontrado para restaurar MPV');
+        }
+      } catch (err) {
+        console.error('[Window] Error al restaurar MPV:', err);
+      }
     }
-    return { action: 'deny' };
+  });
+
+  mainWindow.on('close', (event) => {
+    if (mpvProcess) {
+      try {
+        mpvProcess.kill();
+        console.log('[Window] MPV detenido correctamente');
+      } catch (err) {
+        console.error('[Window] Error al detener MPV:', err);
+      } finally {
+        mpvProcess = null;
+      }
+    }
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    log('Ventana cerrada.');
   });
 }
 
-app.whenReady().then(() => {
-  log(`App lista. isDev = ${isDev} (FORZADO), Versión App: ${appVersion}`);
-
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Embedder-Policy': 'require-corp'
-      }
-    });
-  });
-
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
+app.whenReady().then(createMainWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -111,10 +111,215 @@ app.on('window-all-closed', () => {
   }
 });
 
-process.on('uncaughtException', (error) => {
-  log(`[ERROR NO CAPTURADO] ${error.message}\n${error.stack}`);
-  if (app && app.isReady()) {
-    const { dialog } = require('electron');
-    dialog.showErrorBox('Error inesperado en el proceso principal', `${error.name}: ${error.message}\n${error.stack}`);
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createMainWindow();
+  }
+});
+
+// -----------------------------------------------------------
+// IPC: reproducir video con MPV
+// -----------------------------------------------------------
+ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { success: false, error: 'MainWindow no existe' };
+    }
+
+    // 1) Si ya había un MPV corriendo, lo detenemos
+    if (mpvProcess) {
+      try {
+        mpvProcess.kill();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Esperar a que MPV se cierre
+        console.log('[MPV] Proceso anterior detenido correctamente');
+      } catch (err) {
+        console.error('[MPV] Error al detener proceso anterior:', err);
+      } finally {
+        mpvProcess = null;
+      }
+    }
+
+    // 2) Iniciar MPV
+    const initMPV = async () => {
+      try {
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          throw new Error('La ventana principal no está disponible');
+        }
+
+        // 3) Ruta a mpv.exe y verificación
+        const mpvDir = isDev ? path.join(__dirname, 'mpv') : path.join(process.resourcesPath, 'mpv');
+        const mpvBinPath = path.join(mpvDir, 'mpv.exe');
+        
+        if (!require('fs').existsSync(mpvBinPath)) {
+          console.error('[MPV] Ejecutable no encontrado en:', mpvBinPath);
+          console.error('[MPV] Contenido del directorio:', require('fs').readdirSync(mpvDir));
+          throw new Error(`MPV no encontrado en: ${mpvBinPath}`);
+        }
+        
+        // Verificar DLLs necesarias
+        const requiredDlls = ['D3DCompiler_47.dll', 'libmpv-2.dll'];
+        for (const dll of requiredDlls) {
+          const dllPath = path.join(mpvDir, dll);
+          if (!require('fs').existsSync(dllPath)) {
+            console.error(`[MPV] DLL requerida no encontrada: ${dll} en ${dllPath}`);
+            throw new Error(`DLL requerida no encontrada: ${dll}`);
+          }
+        }
+        
+        console.log('[MPV] Usando ejecutable:', mpvBinPath);
+
+        // 4) Construir argumentos de MPV
+        const args = [];
+        
+        // Configuración mínima necesaria
+        args.push('--title=TeamG Play');       // Título de la ventana
+        args.push(`--geometry=${bounds.width}x${bounds.height}+${bounds.x}+${bounds.y}`);
+        args.push('--no-border');              // Sin bordes
+        args.push('--force-window=yes');       // Forzar ventana
+        args.push('--no-terminal');            // No mostrar terminal
+        args.push('--keep-open=always');       // Mantener abierto
+        args.push('--vo=gpu');                 // Salida de video GPU
+        args.push('--gpu-api=d3d11');         // API de GPU
+        args.push('--hwdec=auto-safe');       // Decodificación por hardware
+        args.push('--cache=yes');             // Habilitar caché
+        
+        // URL del video
+        args.push('--');  // Separador para evitar confusión con URLs que empiezan con guión
+        args.push(url);
+
+        console.log('[main] Lanzando mpv.exe con args:', args);
+
+        // 5) Lanzar mpv.exe como proceso separado
+        mpvProcess = spawn(mpvBinPath, args, {
+          cwd: path.dirname(mpvBinPath),
+          stdio: ['pipe', 'pipe', 'pipe'],  // Capturar stdin, stdout y stderr
+          detached: false,
+          windowsHide: false,  // Mostrar ventana en Windows
+          env: {
+            ...process.env,
+            MPV_HOME: mpvDir  // Asegurar que MPV encuentra sus archivos de configuración
+          }
+        });
+
+        // Esperar a que MPV esté listo y capturar salida
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Timeout esperando a que MPV inicie'));
+          }, 5000); // 5 segundos máximo
+
+          // Resolver cuando el proceso inicie
+          mpvProcess.on('spawn', () => {
+            console.log('[MPV] Proceso iniciado correctamente');
+            clearTimeout(timeout);
+            resolve();
+          });
+
+          // Manejar error de proceso
+          mpvProcess.on('error', (err) => {
+            const errorMsg = 'Error al iniciar MPV: ' + err.message;
+            console.error('[MPV]', errorMsg);
+            mainWindow.webContents.send('mpv-error', errorMsg);
+            clearTimeout(timeout);
+            reject(new Error(errorMsg));
+          });
+
+          // Capturar salida para logs
+          mpvProcess.stdout.on('data', (data) => {
+            console.log('[MPV stdout]:', data.toString());
+          });
+
+          mpvProcess.stderr.on('data', (data) => {
+            const error = data.toString();
+            
+            // Ignorar mensajes no críticos
+            if (error.includes('fontconfig') || 
+                error.includes('cannot connect to server') ||
+                error.includes('Failed to load module') ||
+                error.includes('[cplayer] ')) {
+              return;
+            }
+
+            // Detectar errores críticos
+            const criticalErrors = [
+              'cannot open file',
+              'failed to open',
+              'failed to load',
+              'error loading',
+              'failed to initialize',
+              'could not open',
+              'failed to connect',
+              'connection refused',
+              'connection timeout',
+              'protocol error',
+              'unsupported protocol',
+              'no video',
+              'no demuxer',
+              'no decoder',
+              'playback error'
+            ];
+
+            if (criticalErrors.some(e => error.toLowerCase().includes(e))) {
+              const errorMsg = 'Error de reproducción: ' + error.trim();
+              console.error('[MPV]', errorMsg);
+              mainWindow.webContents.send('mpv-error', errorMsg);
+            } else {
+              console.error('[MPV stderr]:', error);
+            }
+          });
+        });
+
+        // Función helper para enviar errores al renderer
+        const sendMpvError = (error) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mpv-error', error);
+          }
+        };
+
+        mpvProcess.on('error', (err) => {
+          const errorMsg = err.message || 'Error desconocido al iniciar MPV';
+          console.error('[MPV Error]:', errorMsg);
+          sendMpvError(errorMsg);
+        });
+
+        mpvProcess.on('exit', (code) => {
+          const exitMsg = code ? `MPV se cerró con código: ${code}` : 'MPV se cerró normalmente';
+          console.log('[MPV Exit]:', exitMsg);
+          if (code !== 0) {
+            sendMpvError(exitMsg);
+          }
+          mpvProcess = null;
+        });
+      } catch (err) {
+        const errorMsg = err.message || 'Error desconocido al inicializar MPV';
+        console.error('[MPV Init Error]:', errorMsg);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('mpv-error', errorMsg);
+        }
+        throw err;
+      }
+    };
+
+    await initMPV();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// -----------------------------------------------------------
+// IPC: detener MPV
+// -----------------------------------------------------------
+ipcMain.handle('mpv-embed-stop', async () => {
+  try {
+    if (mpvProcess) {
+      mpvProcess.kill();
+      await new Promise(resolve => setTimeout(resolve, 100)); // Pequeña espera para asegurar que MPV se cierre
+      console.log('[MPV] Proceso detenido correctamente');
+    }
+    mpvProcess = null;
+    return { success: true };
+  } catch (error) {
+    console.error('[MPV] Error al detener el proceso:', error);
+    return { success: false, error: error.message };
   }
 });

@@ -14,7 +14,7 @@ export default function Carousel({ title, items = [], onItemClick, itemType = 'i
         {title}
       </h2>
       <div
-        className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 pl-1 pr-1 hide-scrollbar"
+        className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 pl-1 pr-1 hide-scrollbar [&>*]:w-[120px] sm:[&>*]:w-[150px] md:[&>*]:w-[180px]"
         aria-label={`Carrusel de ${title}`}
       >
         {items.map((item) => (

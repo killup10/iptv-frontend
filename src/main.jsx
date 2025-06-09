@@ -6,6 +6,7 @@ import './index.css';
 // Cambiamos createBrowserRouter por createHashRouter para Electron
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Importar Páginas
 import Home from './pages/Home.jsx';
@@ -16,6 +17,11 @@ import Watch from './pages/Watch.jsx'; // Página de reproducción
 import LiveTVPage from './pages/LiveTVPage.jsx';
 import MoviesPage from './pages/MoviesPage.jsx';
 import SeriesPage from './pages/SeriesPage.jsx';
+import Animes from './pages/Animes.jsx';
+import Documentales from './pages/Documentales.jsx';
+import Doramas from './pages/Doramas.jsx';
+import Novelas from './pages/Novelas.jsx';
+import BulkUploadPage from './pages/BulkUploadPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 // import NotFoundPage from './pages/NotFoundPage.jsx'; // Descomenta si tienes una página 404 personalizada
 
@@ -70,6 +76,46 @@ const router = createHashRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        path: "animes",
+        element: (
+          <ProtectedRoute>
+            <Animes />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "doramas",
+        element: (
+          <ProtectedRoute>
+            <Doramas />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "novelas",
+        element: (
+          <ProtectedRoute>
+            <Novelas />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "documentales",
+        element: (
+          <ProtectedRoute>
+            <Documentales />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "bulk-upload",
+        element: (
+          <ProtectedRoute adminOnly={true}>
+            <BulkUploadPage />
+          </ProtectedRoute>
+        ),
+      },
       // Ruta catch-all para 404 (opcional, pero recomendada)
       // Asegúrate de que esta sea la última ruta dentro de los children de AppLayout
       // { path: "*", element: <NotFoundPage /> }, // Descomenta si tienes NotFoundPage
@@ -81,8 +127,10 @@ const router = createHashRouter([
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

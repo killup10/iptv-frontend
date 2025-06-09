@@ -1,41 +1,83 @@
 // src/utils/AuthService.js
-import axiosInstance from "./axiosInstance.js"; // <--- CAMBIO: Importa tu instancia configurada
+import axiosInstance from "./axiosInstance.js";
 
-// API_URL ya no es necesaria aquí si la baseURL está en axiosInstance
-// const API_URL = import.meta.env.VITE_API_URL;
+// Función para obtener el deviceId único para este dispositivo
+const getDeviceId = () => {
+  // Usar una combinación de userAgent y otros datos para crear un ID más único
+  const deviceInfo = {
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    platform: navigator.platform,
+    screenResolution: `${window.screen.width}x${window.screen.height}`
+  };
+  
+  // Crear un hash simple de la información del dispositivo
+  const str = JSON.stringify(deviceInfo);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `device_${Math.abs(hash)}`;
+};
 
 export const login = async (username, password) => {
-  const deviceId = navigator.userAgent;
-  // La ruta es relativa porque baseURL ya está en axiosInstance
+  const deviceId = getDeviceId();
   const loginPath = "/api/auth/login";
   console.log(`AuthService: Intentando login para ${username} en ${loginPath} (usando axiosInstance)`);
   try {
-    const response = await axiosInstance.post(loginPath, { // <--- CAMBIO: Usa axiosInstance
+    const response = await axiosInstance.post(loginPath, {
       username,
       password,
       deviceId,
     });
+
+    // Guardar el deviceId en localStorage para usarlo en logout
+    localStorage.setItem('deviceId', deviceId);
+    
     return response.data;
   } catch (error) {
-    // El interceptor de axiosInstance ya habrá manejado errores 401/403 globalmente
-    // y redirigido si es necesario. Aquí podemos loguear el error específico de esta llamada
-    // y el error que se re-lanza desde el interceptor será capturado por Login.jsx.
-    console.error("Error en AuthService - login (después de interceptores):", error.response?.data || error.message);
-    throw error.response?.data || new Error(error.message || "Error desconocido en el servicio de login.");
+    console.error("Error en AuthService - login:", error.response?.data || error.message);
+    
+    // Manejar específicamente el error de sesiones múltiples
+    if (error.response?.status === 403 && error.response?.data?.error?.includes("Límite de dispositivos")) {
+      throw new Error("Has alcanzado el límite de dispositivos conectados. Por favor, cierra sesión en otro dispositivo para continuar.");
+    }
+    
+    // Asegurar que siempre se lance un Error con mensaje string
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || "Error desconocido en el servicio de login.";
+    throw new Error(errorMessage);
   }
 };
 
 export const register = async (username, password) => {
   const registerPath = "/api/auth/register";
-  console.log(`AuthService: Intentando registro para ${username} en ${registerPath} (usando axiosInstance)`);
+  console.log(`AuthService: Intentando registro para ${username} en ${registerPath}`);
   try {
-    const response = await axiosInstance.post(registerPath, { // <--- CAMBIO: Usa axiosInstance
+    const response = await axiosInstance.post(registerPath, {
       username,
       password,
     });
     return response.data;
   } catch (error) {
-    console.error("Error en AuthService - register (después de interceptores):", error.response?.data || error.message);
+    console.error("Error en AuthService - register:", error.response?.data || error.message);
     throw error.response?.data || new Error(error.message || "Error desconocido en el servicio de registro.");
+  }
+};
+
+export const logout = async (allDevices = false) => {
+  const logoutPath = "/api/auth/logout";
+  try {
+    const deviceId = allDevices ? null : localStorage.getItem('deviceId');
+    await axiosInstance.post(logoutPath, { deviceId });
+    
+    // Limpiar el deviceId del localStorage
+    localStorage.removeItem('deviceId');
+    
+    return true;
+  } catch (error) {
+    console.error("Error en AuthService - logout:", error.response?.data || error.message);
+    throw error.response?.data || new Error(error.message || "Error al cerrar sesión.");
   }
 };

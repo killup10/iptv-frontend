@@ -1,111 +1,273 @@
-// src/pages/Watch.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import VideoPlayer from "../components/VideoPlayer.jsx"; // Tu VideoPlayer actualizado
-import { useAuth } from "@/context/AuthContext.jsx"; // Asumo que no se usa directamente aquí si axiosInstance maneja token
 import { getPlayableUrl } from "@/utils/playerUtils.js";
 import axiosInstance from "@/utils/axiosInstance.js";
+import SeriesChapters from "@/components/SeriesChapters.jsx";
+// --- 1. IMPORTAR EL SERVICIO PARA GUARDAR PROGRESO ---
+import { videoProgressService } from '@/services/videoProgress.js';
+import { throttle } from 'lodash'; // Se necesita lodash para throttling
 
 export function Watch() {
-  const { itemType, itemId } = useParams();
-  const location = useLocation(); // Hook para acceder al estado de la ruta
-  const [itemData, setItemData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
+  const { itemType, itemId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const M3U8_PROXY_BASE_URL = "https://stream.teamg.store"; // O la URL de tu proxy si es diferente
+  const [itemData, setItemData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [bounds, setBounds] = useState(null);
 
-  // Determinar si es "Continuar Viendo" y el tiempo de inicio
-  // Si location.state.continueWatching es true, significa que venimos de "Continuar Viendo"
+  const videoAreaRef = useRef(null);
   const isContinueWatching = location.state?.continueWatching === true;
-  const startTimeFromState = location.state?.startTime || 0; // Tiempo guardado
+  const startTimeFromState = location.state?.startTime || 0;
 
-  // initialAutoplay será false si es "Continuar Viendo", de lo contrario true.
-  const shouldAutoplay = !isContinueWatching;
+  // --- 2. USEREF PARA GUARDAR LA ÚLTIMA POSICIÓN Y EVITAR RE-RENDERS ---
+  const lastSavedTimeRef = useRef(0);
 
-  console.log(`[Watch.jsx] Renderizando. itemType: ${itemType}, itemId: ${itemId}, startTime desde location: ${startTimeFromState}, isContinueWatching: ${isContinueWatching}, shouldAutoplay: ${shouldAutoplay}`);
+  // --- 3. FUNCIÓN PARA GUARDAR PROGRESO CON THROTTLE ---
+  // Se usa 'useRef' para que la función no se recree en cada render.
+  // throttle(..., 5000) asegura que la función se ejecute como máximo una vez cada 5 segundos.
+  const throttledSaveProgress = useRef(
+    throttle((currentTime) => {
+      if (!itemId || itemType === 'channel') return; // No guardar progreso para canales
 
-  useEffect(() => {
-    console.log(`[Watch.jsx] useEffect [itemId, itemType] ejecutándose. itemId: ${itemId}, itemType: ${itemType}`);
-    const fetchItemDetails = async () => {
-      if (!itemId || !itemType) {
-        console.error("[Watch.jsx] Faltan itemId o itemType. No se puede hacer fetch.");
-        setError("Falta información para cargar el contenido (tipo o ID).");
-        setLoading(false);
-        return;
+      // Solo guardar si el tiempo ha avanzado significativamente (evita guardados innecesarios)
+      if (Math.abs(currentTime - lastSavedTimeRef.current) > 4) {
+        console.log(`[Watch.jsx] Guardando progreso... Tiempo: ${currentTime}`);
+        videoProgressService.saveProgress(itemId, {
+          lastTime: currentTime,
+          // Aquí puedes añadir lógica para 'lastChapter' si es una serie
+          // completed: false (se podría manejar al final del video)
+        });
+        lastSavedTimeRef.current = currentTime;
       }
-      setLoading(true);
-      setError(null);
-      console.log(`[Watch.jsx] Iniciando fetchItemDetails para itemId: ${itemId}, itemType: ${itemType}`);
-      try {
-        let data;
-        let endpoint = "";
-        if (itemType === "channel") {
-          endpoint = `/api/channels/id/${itemId}`;
-        } else if (itemType === "movie" || itemType === "serie") {
-          endpoint = `/api/videos/${itemId}`;
-        } else {
-          console.error(`[Watch.jsx] Tipo de contenido "${itemType}" no reconocido.`);
-          setError(`Tipo de contenido "${itemType}" no reconocido.`);
-          setLoading(false);
-          return;
-        }
-        
-        console.log(`[Watch.jsx] Haciendo GET a endpoint: ${endpoint}`);
-        const response = await axiosInstance.get(endpoint);
-        data = response.data;
-        console.log("[Watch.jsx] Datos recibidos del backend:", JSON.parse(JSON.stringify(data || {})));
+    }, 5000) // Guardar progreso cada 5000ms (5 segundos)
+  ).current;
 
-        if (!data) {
-          throw new Error("No se recibieron datos del backend para este item.");
+
+  // 1) Fetch de detalles del contenido
+  useEffect(() => {
+    const fetchItemDetails = async () => {
+      if (!itemId || !itemType) {
+        setError("Falta información para cargar el contenido.");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        let endpoint = "";
+        if (itemType === "channel") {
+          endpoint = `/api/channels/id/${itemId}`;
+        } else if (["movie", "serie", "series"].includes(itemType)) {
+          endpoint = `/api/videos/${itemId}`;
+        } else {
+          setError(`Tipo de contenido "${itemType}" no reconocido.`);
+          setLoading(false);
+          return;
+        }
+        const response = await axiosInstance.get(endpoint);
+        const data = response.data;
+        if (!data) {
+          throw new Error("No se recibieron datos del backend.");
+        }
+        const normalizedData = {
+          id: data._id || data.id,
+          name: data.name || data.title || data.titulo || "Sin título",
+          url: data.url,
+          description: data.description || data.descripcion || "",
+          releaseYear: data.releaseYear,
+          tipo: data.tipo || itemType,
+          chapters: Array.isArray(data.chapters) ? data.chapters : []
+        };
+        if (process.env.NODE_ENV === "development") {
+          console.log("[Watch.jsx] Datos normalizados:", normalizedData);
+        }
+        setItemData(normalizedData);
+      } catch (err) {
+        setError(`No se pudo cargar el contenido. ${err.response?.data?.error || err.message || "Error desconocido."}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchItemDetails();
+  }, [itemId, itemType]);
+
+  // 2) Cuando tenemos itemData, calculamos la URL reproducible
+  useEffect(() => {
+    if (!itemData) return;
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Watch.jsx] itemData recibido:", itemData);
+    }
+    const M3U8_PROXY_BASE_URL = "https://stream.teamg.store";
+    let finalUrl = "";
+    const typesWithChapters = ["serie", "anime", "dorama", "novela", "documental"];
+    if (typesWithChapters.includes(itemData.tipo) && itemData.chapters?.length > 0) {
+      const chapterIndex = location.state?.chapterIndex || 0;
+      const chapter = itemData.chapters[chapterIndex];
+      if (chapter?.url) {
+        finalUrl = getPlayableUrl({ ...itemData, url: chapter.url }, M3U8_PROXY_BASE_URL);
+      } else {
+        setError("El capítulo seleccionado no tiene una URL válida.");
+        return;
+      }
+    } else if (itemData.url) {
+      finalUrl = getPlayableUrl(itemData, M3U8_PROXY_BASE_URL);
+    }
+    setVideoUrl(finalUrl);
+  }, [itemData, location.state?.chapterIndex]);
+
+  // 3) Cuando cambie videoUrl, medimos las bounds de videoAreaRef
+  useEffect(() => {
+    if (videoUrl && videoAreaRef.current) {
+      const rect = videoAreaRef.current.getBoundingClientRect();
+      if (process.env.NODE_ENV === "development") {
+        console.log('[Watch.jsx] getBoundingClientRect →', rect);
+      }
+      setBounds({
+        x: Math.floor(rect.left),
+        y: Math.floor(rect.top),
+        width: Math.floor(rect.width),
+        height: Math.floor(rect.height),
+      });
+    }
+  }, [videoUrl]);
+
+  // 4) Iniciar MPV y SUSCRIBIRSE a eventos de progreso
+  useEffect(() => {
+    const isElectronEnv = typeof window !== "undefined" && window.electronMPV;
+    if (!videoUrl || !bounds || !isElectronEnv) return;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log('[Watch.jsx] Iniciando MPV con URL:', videoUrl);
+    }
+    
+    window.electronMPV.play(videoUrl, bounds, { startTime: startTimeFromState })
+      .catch(err => {
+        console.error('[Watch.jsx] Error al iniciar MPV:', err);
+        setError(`Error al iniciar el reproductor: ${err.message}`);
+      });
+
+    const handleMpvError = (event, message) => {
+      console.error('[Watch.jsx] MPV Error:', message);
+      setError(`Error del reproductor: ${message}`);
+    };
+
+    // --- LÓGICA PARA ESCUCHAR EL TIEMPO ---
+    const handleTimePos = (event, time) => {
+        // 'time' es el tiempo actual de reproducción en segundos
+        if (time > 0) {
+            throttledSaveProgress(time);
         }
-        const normalizedData = {
-          id: data._id || data.id, // Usar _id como fallback si id no existe
-          name: data.name || data.title || data.titulo || "Contenido sin título",
-          url: data.url,
-          description: data.description || data.descripcion || "",
-          releaseYear: data.releaseYear,
-          tipo: data.tipo || itemType,
-          // Asegúrate de que 'uniqueId' se mapee correctamente al ID que usa useVideoProgress
-          // Si tu useVideoProgress usa 'itemId', entonces 'itemId' debe ser el ID único del video/canal.
-          // Aquí estoy asumiendo que el 'itemId' de la URL es el que se usa para el progreso.
-        };
-        console.log("[Watch.jsx] Datos normalizados (itemData) listos para setear:", JSON.parse(JSON.stringify(normalizedData)));
-        setItemData(normalizedData);
-      } catch (err) {
-        console.error(`[Watch.jsx] Error en fetchItemDetails para ${itemType} (ID: ${itemId}):`, err.response?.data || err.message, err);
-        setError(`No se pudo cargar el contenido. ${err.response?.data?.error || err.message || 'Error desconocido.'}`);
-      } finally {
-        setLoading(false);
-      }
     };
-    fetchItemDetails();
-  }, [itemId, itemType]); // No incluir startTimeFromState aquí, ya que no cambia el *item* a fetchear
+    
+    if (window.electronAPI) {
+      console.log('[Watch.jsx] Suscribiendo a eventos MPV (error y time-pos)...');
+      window.electronAPI.on('mpv-error', handleMpvError);
+      // Suscribirse al evento que notifica la posición del tiempo
+      window.electronAPI.on('mpv-time-pos', handleTimePos); 
+    }
 
-  if (loading) return <div className="flex justify-center items-center min-h-screen bg-black"><div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
+    return () => {
+      console.log('[Watch.jsx] Limpiando recursos MPV...');
+      if (window.electronMPV) {
+        window.electronMPV.stop();
+      }
+      if (window.electronAPI) {
+        // Limpiar los listeners al desmontar el componente
+        window.electronAPI.removeListener('mpv-error', handleMpvError);
+        window.electronAPI.removeListener('mpv-time-pos', handleTimePos);
+      }
+    };
+  }, [videoUrl, bounds, startTimeFromState, throttledSaveProgress]); // Añadir dependencias
+
+  // 5) Suscribirse a petición de sincronización de bounds
+  useEffect(() => {
+    const isElectronEnv = typeof window !== "undefined" && window.electronMPV;
+    if (!bounds || !isElectronEnv) return;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log('[Watch.jsx] Registrando handler onRequestVideoBoundsSync');
+    }
+
+    const removeListener = window.electronMPV.onRequestVideoBoundsSync(() => {
+      if (process.env.NODE_ENV === "development") {
+        console.log('[Watch.jsx] onRequestVideoBoundsSync: reenviando bounds', bounds);
+      }
+      if (videoAreaRef.current) {
+        const r = videoAreaRef.current.getBoundingClientRect();
+        window.electronMPV.updateBounds({
+          x: Math.floor(r.left),
+          y: Math.floor(r.top),
+          width: Math.floor(r.width),
+          height: Math.floor(r.height),
+        });
+      }
+    });
+
+    return () => {
+      if (process.env.NODE_ENV === "development") {
+        console.log('[Watch.jsx] Eliminando handler onRequestVideoBoundsSync');
+      }
+      removeListener();
+    };
+  }, [bounds]);
+
+  // --- RENDERIZADO (CÓDIGO RESTAURADO) ---
+  if (loading)
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="text-red-500 p-10 text-center min-h-screen bg-black pt-20">
+        {error}
+        <button
+          onClick={() => navigate(-1)}
+          className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded"
+        >
+          Volver
+        </button>
+      </div>
+    );
+
+  if (!itemData)
+    return (
+      <div className="text-white p-10 text-center min-h-screen bg-black pt-20">
+        Información del contenido no disponible.
+        <button
+          onClick={() => navigate(-1)}
+          className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded"
+        >
+          Volver
+        </button>
+      </div>
+    );
+
+  const hasValidContent = itemData.url || (itemData.chapters && itemData.chapters.length > 0);
   
-  if (error) {
-    console.error("[Watch.jsx] Renderizando error:", error);
-    return <div className="text-red-500 p-10 text-center min-h-screen bg-black pt-20">{error} <button onClick={() => navigate(-1)} className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded">Volver</button></div>;
-  }
-  
-  if (!itemData) {
-    console.warn("[Watch.jsx] Renderizando: itemData es null pero no hay error ni loading.");
-    return <div className="text-white p-10 text-center min-h-screen bg-black pt-20">Información del contenido no disponible. <button onClick={() => navigate(-1)} className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded">Volver</button></div>;
-  }
-
-  if (!itemData.url) {
-    console.error("[Watch.jsx] Renderizando: itemData NO tiene URL.", JSON.parse(JSON.stringify(itemData)));
-    return <div className="text-white p-10 text-center min-h-screen bg-black pt-20">URL del contenido no disponible. <button onClick={() => navigate(-1)} className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded">Volver</button></div>;
-  }
-
-  const finalPlayableUrl = getPlayableUrl(itemData, M3U8_PROXY_BASE_URL);
-  console.log(`[Watch.jsx] finalPlayableUrl calculada para VideoPlayer: ${finalPlayableUrl}`);
-  console.log(`[Watch.jsx] Props para VideoPlayer: url=${finalPlayableUrl}, itemId=${itemId}, startTime=${startTimeFromState}, initialAutoplay=${shouldAutoplay}`);
+  if (!hasValidContent)
+    return (
+      <div className="text-white p-10 text-center min-h-screen bg-black pt-20">
+        No hay contenido disponible para reproducir.
+        <div className="mt-4 text-sm text-gray-400">
+          Debug info: URL={itemData.url || 'null'}, Chapters={itemData.chapters?.length || 0}
+        </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded"
+        >
+          Volver
+        </button>
+      </div>
+    );
 
   return (
-    <div className="bg-zinc-900 min-h-screen flex flex-col pt-16"> {/* Ajuste de padding-top si el header es fixed */}
+    <div className="bg-zinc-900 min-h-screen flex flex-col pt-16">
       <div className="container mx-auto px-2 sm:px-4 py-4 flex-grow flex flex-col">
         <div className="mb-4 flex items-center justify-between w-full max-w-screen-xl mx-auto">
           <button
@@ -118,34 +280,49 @@ export function Watch() {
 
         <div className="flex-grow flex flex-col items-center">
           <div className="w-full max-w-screen-xl">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 px-1 sm:px-0">
+            <h1 className="text-2xl font-bold text-white mb-4">
               {itemData.name}
-              {itemData.releaseYear && itemData.tipo !== 'channel' && <span className="text-gray-300 text-lg sm:text-xl ml-2">({itemData.releaseYear})</span>}
             </h1>
-
-            <div className="w-full mb-6">
-              {finalPlayableUrl ? (
-                <VideoPlayer
-                  url={finalPlayableUrl}
-                  itemId={itemId} // Pasar el itemId de la URL, que es el que usa useVideoProgress
-                  startTime={startTimeFromState}
-                  initialAutoplay={shouldAutoplay} // Pasar la prop para controlar autoplay
-                />
-              ) : (
-                <p className="text-orange-400 text-center py-10">La URL para este contenido no es válida o no se pudo procesar.</p>
-              )}
+            
+            {itemData.chapters?.length > 0 && location.state?.chapterIndex !== undefined && (
+              <p className="text-sm text-gray-400 mb-2">
+                Episodio: {itemData.chapters[location.state.chapterIndex]?.title || "Sin título"}
+              </p>
+            )}
+            
+            <div
+              ref={videoAreaRef}
+              className="w-full mb-6 bg-black"
+              style={{ position: "relative", width: "100%", height: "450px" }}
+            >
+              <div className="flex items-center justify-center h-full text-white">
+                {!videoUrl && "Cargando video..."}
+              </div>
             </div>
           </div>
 
-          {itemData.description && (
-            <div className="p-4 bg-zinc-800 rounded-lg text-gray-300 max-w-screen-xl w-full">
-              <h3 className="text-xl font-semibold text-white mb-2">Descripción</h3>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{itemData.description}</p>
-            </div>
-          )}
+          <div className="space-y-4 w-full max-w-screen-xl">
+            {itemData.description && (
+              <div className="p-4 bg-zinc-800 rounded-lg text-gray-300">
+                <h3 className="text-xl font-semibold text-white mb-2">Descripción</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {itemData.description}
+                </p>
+              </div>
+            )}
+
+            {(itemData.tipo === "serie" || itemData.tipo === "series") && itemData.chapters?.length > 0 && (
+              <SeriesChapters
+                chapters={itemData.chapters}
+                serieId={itemData.id}
+                currentChapter={location.state?.chapterIndex || 0}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 export default Watch;
