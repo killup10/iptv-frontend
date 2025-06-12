@@ -296,40 +296,48 @@ export default function AdminPanel() {
   const [vodTotalPages, setVodTotalPages] = useState(1);
   const [vodTotalCount, setVodTotalCount] = useState(0);
   const [vodSearchTerm, setVodSearchTerm] = useState("");
+  const [vodFilterTipo, setVodFilterTipo] = useState("");
 
   const fetchVideosList = useCallback(
-  async (page = vodCurrentPage, search = vodSearchTerm) => {
-    setIsLoading(prev => ({ ...prev, vod: true }));
-    clearMessages();
-    try {
-      const params = { view: 'admin', page, limit: VODS_PER_PAGE, search: search.trim() };
-      const response = await axiosInstance.get("/api/videos", { params });
-      const data = response.data;
-      console.log("Respuesta del backend:", data);
+    async (
+      requestedPage = vodCurrentPage,
+      search = vodSearchTerm,
+      tipo = vodFilterTipo
+    ) => {
+      setIsLoading(prev => ({ ...prev, vod: true }));
+      clearMessages();
+      try {
+        const pageNum = parseInt(requestedPage, 10) || 1;
+        const params = { view: 'admin', limit: VODS_PER_PAGE };
+        params.skip = (pageNum - 1) * VODS_PER_PAGE;
+        if (search.trim()) params.search = search.trim();
+        if (tipo) params.tipo = tipo;
+        const response = await axiosInstance.get('/api/videos', { params });
+        const data = response.data;
+        console.log('Respuesta del backend:', data);
 
-      setVideos(data.videos || []);
-      setVodCurrentPage(data.page || page);
+        setVideos(Array.isArray(data.videos) ? data.videos : []);
+        setVodCurrentPage(pageNum);
 
-      // Ajuste clave: si no viene pages del backend, lo calculamos
-      const totalCount = data.total || 0;
-      const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
-      setVodTotalCount(totalCount);
-      setVodTotalPages(data.pages || calculatedPages);
+        const totalCount = data.total || 0;
+        const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
+        setVodTotalCount(totalCount);
+        setVodTotalPages(calculatedPages);
 
-      if (!data.videos || data.videos.length === 0) {
-        setSuccessMsg("No se encontraron VODs con los criterios actuales.");
+        if (!data.videos || data.videos.length === 0) {
+          setSuccessMsg('No se encontraron VODs con los criterios actuales.');
+        }
+      } catch (err) {
+        setErrorMsg(err.response?.data?.message || err.message || 'Fallo al cargar VODs.');
+        setVideos([]);
+        setVodTotalPages(1);
+        setVodTotalCount(0);
+      } finally {
+        setIsLoading(prev => ({ ...prev, vod: false }));
       }
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || "Fallo al cargar VODs.");
-      setVideos([]);
-      setVodTotalPages(1);
-      setVodTotalCount(0);
-    } finally {
-      setIsLoading(prev => ({ ...prev, vod: false }));
-    }
-  },
-  [vodSearchTerm, clearMessages] // IMPORTANTE: se elimina vodCurrentPage del array de dependencias
-);
+    },
+    [vodSearchTerm, vodFilterTipo, clearMessages]
+  );
   
   const clearVodForm = useCallback(() => { 
     setVodId(null); 
@@ -694,7 +702,7 @@ export default function AdminPanel() {
   onSubmit={e => {
     e.preventDefault();
     setVodCurrentPage(1);
-    fetchVideosList(1, vodSearchTerm);
+    fetchVideosList(1, vodSearchTerm, vodFilterTipo);
   }}
   className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4"
 >
@@ -705,6 +713,19 @@ export default function AdminPanel() {
     onChange={e => setVodSearchTerm(e.target.value)}
     className="w-full sm:max-w-xs"
   />
+  <Select
+    value={vodFilterTipo}
+    onChange={e => setVodFilterTipo(e.target.value)}
+    className="w-full sm:max-w-xs"
+  >
+    <option value="">Todos</option>
+    <option value="pelicula">Película</option>
+    <option value="serie">Serie</option>
+    <option value="anime">Anime</option>
+    <option value="dorama">Dorama</option>
+    <option value="novela">Novela</option>
+    <option value="documental">Documental</option>
+  </Select>
   <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
     Buscar
   </Button>
@@ -718,7 +739,7 @@ export default function AdminPanel() {
         key={num}
         onClick={() => {
           setVodCurrentPage(num);
-          fetchVideosList(num);
+          fetchVideosList(num, vodSearchTerm, vodFilterTipo);
         }}
         className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
       >
@@ -737,7 +758,7 @@ export default function AdminPanel() {
       onClick={() => {
         if (vodCurrentPage > 1) {
           setVodCurrentPage(prev => prev - 1);
-          fetchVideosList(vodCurrentPage - 1, vodSearchTerm);
+          fetchVideosList(vodCurrentPage - 1, vodSearchTerm, vodFilterTipo);
         }
       }}
       disabled={vodCurrentPage === 1}
@@ -751,7 +772,7 @@ export default function AdminPanel() {
         key={num}
         onClick={() => {
           setVodCurrentPage(num);
-          fetchVideosList(num, vodSearchTerm);
+          fetchVideosList(num, vodSearchTerm, vodFilterTipo);
         }}
         className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
       >
@@ -763,7 +784,7 @@ export default function AdminPanel() {
       onClick={() => {
         if (vodCurrentPage < vodTotalPages) {
           setVodCurrentPage(prev => prev + 1);
-          fetchVideosList(vodCurrentPage + 1, vodSearchTerm);
+          fetchVideosList(vodCurrentPage + 1, vodSearchTerm, vodFilterTipo);
         }
       }}
       disabled={vodCurrentPage === vodTotalPages}
