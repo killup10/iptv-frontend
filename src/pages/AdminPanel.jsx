@@ -1,4 +1,3 @@
-// src/pages/AdminPanel.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext.jsx";
 import axiosInstance from "@/utils/axiosInstance.js";
@@ -6,10 +5,10 @@ import {
   fetchAdminChannels, createAdminChannel, updateAdminChannel,
   deleteAdminChannel, processM3UForAdmin,
   fetchAdminVideos, createAdminVideo, updateAdminVideo, deleteAdminVideo,
-  fetchAdminUsers, updateAdminUserPlan, updateAdminUserStatus // <--- IMPORTACIONES PARA USUARIOS
+  fetchAdminUsers, updateAdminUserPlan, updateAdminUserStatus
 } from "@/utils/api.js";
 
-// --- Componentes UI (Mantenidos como en tu versión) ---
+// --- Componentes UI ---
 const Tab = ({ label, value, activeTab, onTabChange, disabled = false }) => (
   <button
     onClick={() => !disabled && onTabChange(value)}
@@ -57,18 +56,18 @@ const Select = React.forwardRef((props, ref) => (
 ));
 
 const Checkbox = ({ label, checked, onChange, disabled, name, value }) => (
-    <label className="flex items-center space-x-2 cursor-pointer">
-        <input
-            type="checkbox"
-            name={name}
-            value={value}
-            checked={checked}
-            onChange={onChange}
-            disabled={disabled}
-            className={`form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-offset-gray-800 focus:ring-red-500 ${disabled ? "opacity-70 cursor-not-allowed" : ""}`}
-        />
-        <span className={`text-sm ${disabled ? "text-gray-500" : "text-gray-300"}`}>{label}</span>
-    </label>
+  <label className="flex items-center space-x-2 cursor-pointer">
+    <input
+      type="checkbox"
+      name={name}
+      value={value}
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      className={`form-checkbox h-5 w-5 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-offset-gray-800 focus:ring-red-500 ${disabled ? "opacity-70 cursor-not-allowed" : ""}`}
+    />
+    <span className={`text-sm ${disabled ? "text-gray-500" : "text-gray-300"}`}>{label}</span>
+  </label>
 );
 
 const Button = ({ children, className, disabled, isLoading, ...props }) => (
@@ -95,11 +94,11 @@ const Button = ({ children, className, disabled, isLoading, ...props }) => (
 );
 
 const MAIN_SECTION_VOD_OPTIONS = [
-    { key: "POR_GENERO", displayName: "POR GÉNEROS (Agrupador)"},
-    { key: "ESPECIALES", displayName: "ESPECIALES (Festividades)"},
-    { key: "CINE_2025", displayName: "CINE 2025 (Estrenos)"},
-    { key: "CINE_4K", displayName: "CINE 4K"},
-    { key: "CINE_60FPS", displayName: "CINE 60 FPS"},
+  { key: "POR_GENERO", displayName: "POR GÉNEROS (Agrupador)"},
+  { key: "ESPECIALES", displayName: "ESPECIALES (Festividades)"},
+  { key: "CINE_2025", displayName: "CINE 2025 (Estrenos)"},
+  { key: "CINE_4K", displayName: "CINE 4K"},
+  { key: "CINE_60FPS", displayName: "CINE 60 FPS"},
 ];
 
 const ALL_AVAILABLE_PLANS = [
@@ -111,6 +110,7 @@ const ALL_AVAILABLE_PLANS = [
 ];
 
 export default function AdminPanel() {
+  const VODS_PER_PAGE = 50;
   const { user } = useAuth();
   const [m3uFile, setM3uFile] = useState(null);
   const [m3uFileNameDisplay, setM3uFileNameDisplay] = useState("");
@@ -119,33 +119,32 @@ export default function AdminPanel() {
   const [vodId, setVodId] = useState(null);
   const [bulkCategoria, setBulkCategoria] = useState("");
   const [bulkSubcategoria, setBulkSubcategoria] = useState("");
-  const [vodForm, setVodForm] = useState({ 
-    title: "", 
-    url: "", 
-    logo: "", 
-    description: "", 
-    trailerUrl: "", 
-    releaseYear: new Date().getFullYear().toString(), 
-    isFeatured: false, 
-    active: true, 
-    tipo: "pelicula", 
-    mainSection: MAIN_SECTION_VOD_OPTIONS[0]?.key || "", 
-    genres: "", 
+  const [vodForm, setVodForm] = useState({
+    title: "",
+    url: "",
+    logo: "",
+    description: "",
+    trailerUrl: "",
+    releaseYear: new Date().getFullYear().toString(),
+    isFeatured: false,
+    active: true,
+    tipo: "pelicula",
+    mainSection: MAIN_SECTION_VOD_OPTIONS[0]?.key || "",
+    genres: "",
     requiresPlan: [],
     chapters: [],
     subcategoria: "Netflix"
   });
-  
-  
+
   const [channels, setChannels] = useState([]);
   const [videos, setVideos] = useState([]);
-  const [adminUsers, setAdminUsers] = useState([]); // Estado para usuarios
+  const [adminUsers, setAdminUsers] = useState([]);
 
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState({ channels: false, vod: false, m3u: false, users: false }); // users añadido
-  const [activeTab, setActiveTab] = useState("manage_users"); // Iniciar en gestionar usuarios por defecto
+  const [isLoading, setIsLoading] = useState({ channels: false, vod: false, m3u: false, users: false });
+  const [activeTab, setActiveTab] = useState("manage_users");
   const [bulkVodFile, setBulkVodFile] = useState(null);
   const [bulkVodFileNameDisplay, setBulkVodFileNameDisplay] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -173,27 +172,22 @@ export default function AdminPanel() {
       setErrorMsg("Por favor, selecciona un archivo M3U o texto.");
       return;
     }
-
     setIsLoading(prev => ({ ...prev, bulkVod: true }));
     clearMessages();
     setUploadProgress(0);
     setProcessingStatus("Iniciando carga...");
-
     const formData = new FormData();
     formData.append("file", bulkVodFile);
 
     try {
-      // Crear una instancia temporal de axios con timeout extendido para carga masiva
       const axiosWithExtendedTimeout = axiosInstance.create({
-        timeout: 300000 // 5 minutos de timeout para carga masiva
+        timeout: 300000
       });
-      
-      // Mostrar mensaje de procesamiento
       setProcessingStatus("Subiendo archivo al servidor...");
       formData.append("categoria", bulkCategoria);
-if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
-  formData.append("subcategoria", bulkSubcategoria);
-}
+      if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
+        formData.append("subcategoria", bulkSubcategoria);
+      }
       const response = await axiosWithExtendedTimeout.post("/api/videos/upload-text", formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -202,7 +196,6 @@ if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percentCompleted);
-          
           if (percentCompleted === 100) {
             setProcessingStatus("Archivo subido. Procesando contenido...");
           } else {
@@ -212,37 +205,24 @@ if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
       });
 
       const result = response.data;
-
-      // Mostrar resumen de resultados
       let successMessage = result.message || `Archivo procesado exitosamente. `;
-      
-      // Si el backend envía el formato antiguo con added/skipped
       if (result.added !== undefined || result.skipped !== undefined) {
         successMessage = `Archivo procesado exitosamente. Videos añadidos: ${result.added || 0}, Omitidos (duplicados): ${result.skipped || 0}`;
-      }
-      // Si el backend envía el formato nuevo con summary
-      else if (result.summary) {
+      } else if (result.summary) {
         successMessage = `Archivo procesado exitosamente. Videos creados: ${result.summary.totalProcessed || 0}`;
         if (result.summary.movies > 0) successMessage += `, Películas: ${result.summary.movies}`;
         if (result.summary.series > 0) successMessage += `, Series: ${result.summary.series}`;
       }
-      
       setSuccessMsg(successMessage);
       setProcessingStatus("");
-      
-      // Mostrar errores si los hay
       if (result.errors && result.errors.length > 0) {
         console.error("Errores durante el procesamiento:", result.errors);
         setErrorMsg(`Se encontraron ${result.errors.length} errores durante el procesamiento. Ver consola para detalles.`);
       }
-
-      // Limpiar el formulario
       setBulkVodFile(null);
       setBulkVodFileNameDisplay("");
       setUploadProgress(0);
       if (e.target.reset) e.target.reset();
-
-      // Actualizar la lista de VODs
       fetchVideosList();
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Error al procesar el archivo de VODs";
@@ -254,17 +234,103 @@ if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
     }
   };
 
-  // --- Lógica para Canales y VODs (sin cambios respecto a la versión anterior que te di) ---
-  const fetchChannelsList = useCallback(async () => { setIsLoading(prev => ({ ...prev, channels: true })); clearMessages(); try { const data = await fetchAdminChannels(); setChannels(data || []); if (!data || data.length === 0) setSuccessMsg("No hay canales para mostrar."); } catch (err) { setErrorMsg(err.message || "Fallo al cargar canales."); setChannels([]); } finally { setIsLoading(prev => ({ ...prev, channels: false })); } }, [clearMessages]);
+  // --- Lógica para Canales y VODs ---
+  const fetchChannelsList = useCallback(async () => {
+    setIsLoading(prev => ({ ...prev, channels: true })); clearMessages();
+    try {
+      const data = await fetchAdminChannels();
+      setChannels(data || []);
+      if (!data || data.length === 0) setSuccessMsg("No hay canales para mostrar.");
+    } catch (err) {
+      setErrorMsg(err.message || "Fallo al cargar canales."); setChannels([]);
+    } finally {
+      setIsLoading(prev => ({ ...prev, channels: false }));
+    }
+  }, [clearMessages]);
   const clearChannelForm = useCallback(() => { setChannelId(null); setChannelForm({ name: "", url: "", logo: "", description: "", section: "General", active: true, isFeatured: false, requiresPlan: [], isPubliclyVisible: true, }); }, []);
   const handleChannelFormChange = (e) => { const { name, value, type, checked } = e.target; setChannelForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); };
   const handleChannelPlanChange = (planKey) => { setChannelForm(prev => ({ ...prev, requiresPlan: prev.requiresPlan.includes(planKey) ? prev.requiresPlan.filter(p => p !== planKey) : [...prev.requiresPlan, planKey] })); };
-  const handleEditChannelClick = useCallback((channel) => { setChannelId(channel.id || channel._id); setChannelForm({ name: channel.name || "", url: channel.url || "", logo: channel.logo || "", description: channel.description || "", section: channel.section || "General", active: channel.active !== undefined ? channel.active : true, isFeatured: channel.isFeatured || false, requiresPlan: Array.isArray(channel.requiresPlan) ? channel.requiresPlan.map(String) : (channel.requiresPlan ? [String(channel.requiresPlan)] : []), isPubliclyVisible: channel.isPubliclyVisible === undefined ? true : channel.isPubliclyVisible, }); setActiveTab("add_channel"); clearMessages(); window.scrollTo(0, 0); }, [clearMessages]);
-  const submitChannelForm = async (e) => { e.preventDefault(); setIsSubmitting(true); clearMessages(); try { const dataToSend = { ...channelForm }; if (channelId) { await updateAdminChannel(channelId, dataToSend); setSuccessMsg(`Canal "${dataToSend.name}" actualizado.`); } else { await createAdminChannel(dataToSend); setSuccessMsg(`Canal "${dataToSend.name}" creado.`); } clearChannelForm(); fetchChannelsList(); setActiveTab("manage_channels"); } catch (err) { setErrorMsg(err.message || "Error al guardar canal."); } finally { setIsSubmitting(false); } };
-  const handleDeleteChannelClick = async (id, name) => { if (!id || !window.confirm(`¿Estás seguro de que quieres eliminar el canal "${name || 'este canal'}"?`)) return; setIsSubmitting(true); clearMessages(); try { await deleteAdminChannel(id); setSuccessMsg(`Canal "${name || ''}" eliminado.`); fetchChannelsList(); if (channelId === id) clearChannelForm(); } catch (err) { setErrorMsg(err.message || "Error al eliminar canal."); } finally { setIsSubmitting(false); } };
+  const handleEditChannelClick = useCallback((channel) => {
+    setChannelId(channel.id || channel._id); setChannelForm({
+      name: channel.name || "", url: channel.url || "", logo: channel.logo || "", description: channel.description || "", section: channel.section || "General",
+      active: channel.active !== undefined ? channel.active : true, isFeatured: channel.isFeatured || false, requiresPlan: Array.isArray(channel.requiresPlan) ? channel.requiresPlan.map(String) : (channel.requiresPlan ? [String(channel.requiresPlan)] : []), isPubliclyVisible: channel.isPubliclyVisible === undefined ? true : channel.isPubliclyVisible,
+    }); setActiveTab("add_channel"); clearMessages(); window.scrollTo(0, 0);
+  }, [clearMessages]);
+  const submitChannelForm = async (e) => {
+    e.preventDefault(); setIsSubmitting(true); clearMessages();
+    try {
+      const dataToSend = { ...channelForm };
+      if (channelId) {
+        await updateAdminChannel(channelId, dataToSend);
+        setSuccessMsg(`Canal "${dataToSend.name}" actualizado.`);
+      } else {
+        await createAdminChannel(dataToSend);
+        setSuccessMsg(`Canal "${dataToSend.name}" creado.`);
+      }
+      clearChannelForm(); fetchChannelsList(); setActiveTab("manage_channels");
+    } catch (err) {
+      setErrorMsg(err.message || "Error al guardar canal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const handleDeleteChannelClick = async (id, name) => {
+    if (!id || !window.confirm(`¿Estás seguro de que quieres eliminar el canal "${name || 'este canal'}"?`)) return; setIsSubmitting(true); clearMessages();
+    try {
+      await deleteAdminChannel(id); setSuccessMsg(`Canal "${name || ''}" eliminado.`); fetchChannelsList(); if (channelId === id) clearChannelForm();
+    } catch (err) {
+      setErrorMsg(err.message || "Error al eliminar canal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   const handleM3UFileChange = (e) => { const file = e.target.files[0]; if (file) { setM3uFile(file); setM3uFileNameDisplay(file.name); setSuccessMsg(""); setErrorMsg(""); } else { setM3uFile(null); setM3uFileNameDisplay(""); } };
-  const submitM3UFile = async (e) => { e.preventDefault(); if (!m3uFile) { setErrorMsg("Por favor, selecciona un archivo M3U."); return; } setIsLoading(prev => ({ ...prev, m3u: true })); clearMessages(); const formData = new FormData(); formData.append("m3uFile", m3uFile); try { const result = await processM3UForAdmin(formData); setSuccessMsg(result.message || "Archivo M3U procesado."); setM3uFile(null); setM3uFileNameDisplay(""); if (e.target.reset) e.target.reset(); fetchChannelsList(); } catch (err) { setErrorMsg(err.message || "Error al procesar el archivo M3U."); } finally { setIsLoading(prev => ({ ...prev, m3u: false })); } };
-  const fetchVideosList = useCallback(async () => { setIsLoading(prev => ({ ...prev, vod: true })); clearMessages(); try { const data = await fetchAdminVideos(); setVideos(data || []); if (!data || data.length === 0) setSuccessMsg("No hay VODs para mostrar."); } catch (err) { setErrorMsg(err.message || "Fallo al cargar VODs."); setVideos([]); } finally { setIsLoading(prev => ({ ...prev, vod: false })); } }, [clearMessages]);
+  const submitM3UFile = async (e) => {
+    e.preventDefault(); if (!m3uFile) { setErrorMsg("Por favor, selecciona un archivo M3U."); return; } setIsLoading(prev => ({ ...prev, m3u: true })); clearMessages(); const formData = new FormData(); formData.append("m3uFile", m3uFile);
+    try { const result = await processM3UForAdmin(formData); setSuccessMsg(result.message || "Archivo M3U procesado."); setM3uFile(null); setM3uFileNameDisplay(""); if (e.target.reset) e.target.reset(); fetchChannelsList();
+    } catch (err) { setErrorMsg(err.message || "Error al procesar el archivo M3U."); } finally { setIsLoading(prev => ({ ...prev, m3u: false })); }
+  };
+
+  // --- VOD PAGINACIÓN Y BÚSQUEDA ---
+  const [vodCurrentPage, setVodCurrentPage] = useState(1);
+  const [vodTotalPages, setVodTotalPages] = useState(1);
+  const [vodTotalCount, setVodTotalCount] = useState(0);
+  const [vodSearchTerm, setVodSearchTerm] = useState("");
+
+  const fetchVideosList = useCallback(
+  async (page = vodCurrentPage, search = vodSearchTerm) => {
+    setIsLoading(prev => ({ ...prev, vod: true }));
+    clearMessages();
+    try {
+      const params = { view: 'admin', page, limit: VODS_PER_PAGE, search: search.trim() };
+      const response = await axiosInstance.get("/api/videos", { params });
+      const data = response.data;
+      console.log("Respuesta del backend:", data);
+
+      setVideos(data.videos || []);
+      setVodCurrentPage(data.page || page);
+
+      // Ajuste clave: si no viene pages del backend, lo calculamos
+      const totalCount = data.total || 0;
+      const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
+      setVodTotalCount(totalCount);
+      setVodTotalPages(data.pages || calculatedPages);
+
+      if (!data.videos || data.videos.length === 0) {
+        setSuccessMsg("No se encontraron VODs con los criterios actuales.");
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || "Fallo al cargar VODs.");
+      setVideos([]);
+      setVodTotalPages(1);
+      setVodTotalCount(0);
+    } finally {
+      setIsLoading(prev => ({ ...prev, vod: false }));
+    }
+  },
+  [vodSearchTerm, clearMessages] // IMPORTANTE: se elimina vodCurrentPage del array de dependencias
+);
+  
   const clearVodForm = useCallback(() => { 
     setVodId(null); 
     setVodForm({ 
@@ -624,7 +690,90 @@ if (bulkCategoria === "pelicula" || bulkCategoria === "serie") {
 )}
 
 {/* Pestaña: Gestionar VODs */}
-      {activeTab === "manage_vod" && ( <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl"> <h2 className="text-2xl font-semibold mb-4 px-4 pt-4 sm:px-0 sm:pt-0">Gestionar VODs Existentes</h2> {isLoading.vod ? <div className="text-center py-10 text-gray-400">Cargando VODs...</div> : videos && videos.length > 0 ? ( <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar"> {videos.map(vid => ( <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 hover:bg-gray-600/80 transition-colors rounded-md gap-3"> <img src={vid.logo || vid.thumbnail || '/img/placeholder-thumbnail.png'} alt={vid.title || 'logo'} className="w-16 h-24 object-cover bg-black rounded-sm mr-0 sm:mr-3 flex-shrink-0 self-center sm:self-start border border-gray-600" onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}/> <div className="flex-grow mb-2 sm:mb-0 text-sm min-w-0 text-center sm:text-left"> <strong className={`text-base block truncate ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`} title={vid.title || "Sin Título"}>{vid.title || "Sin Título"} <span className="text-xs text-gray-400">({vid.tipo || 'N/A'})</span></strong> <p className="text-xs text-gray-400 truncate" title={vid.url}>{vid.url}</p> <p className="text-xs text-gray-500">Sección VOD: <span className="text-gray-400">{MAIN_SECTION_VOD_OPTIONS.find(s=>s.key === vid.mainSection)?.displayName || vid.mainSection || 'N/A'}</span></p> <p className="text-xs text-gray-500"> Planes VOD: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span> </p> <p className="text-xs text-gray-500">Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span></p> <p className="text-xs text-gray-500">{vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}</p> </div> <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 flex-shrink-0 self-center sm:self-auto w-full sm:w-auto justify-around sm:justify-start"> <Button onClick={() => handleEditVodClick(vid)} className="flex-1 sm:flex-none bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1.5">Editar</Button> <Button onClick={() => handleDeleteVodClick(vid.id || vid._id, vid.title)} isLoading={isSubmitting} className="flex-1 sm:flex-none bg-red-500 hover:bg-red-400 text-xs px-3 py-1.5">Eliminar</Button> </div> </div> ))} </div> ) : <p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay VODs para mostrar." : ""}</p>} </section> )}
+<form
+  onSubmit={e => {
+    e.preventDefault();
+    setVodCurrentPage(1);
+    fetchVideosList(1, vodSearchTerm);
+  }}
+  className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4"
+>
+  <Input
+    type="text"
+    placeholder="Buscar VOD..."
+    value={vodSearchTerm}
+    onChange={e => setVodSearchTerm(e.target.value)}
+    className="w-full sm:max-w-xs"
+  />
+  <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+    Buscar
+  </Button>
+</form>
+
+{/* Paginación */}
+{vodTotalPages > 1 && (
+  <div className="flex justify-center space-x-2 my-4">
+    {Array.from({ length: vodTotalPages }, (_, idx) => idx + 1).map(num => (
+      <button
+        key={num}
+        onClick={() => {
+          setVodCurrentPage(num);
+          fetchVideosList(num);
+        }}
+        className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
+      >
+        {num}
+      </button>
+    ))}
+  </div>
+)}
+{vodTotalCount > 0 && (
+  <p className="text-sm text-gray-400 text-center sm:text-left px-4">Mostrando {videos.length} de {vodTotalCount} VODs totales</p>
+)}
+      {activeTab === "manage_vod" && ( <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl"> <h2 className="text-2xl font-semibold mb-4 px-4 pt-4 sm:px-0 sm:pt-0">Gestionar VODs Existentes</h2> {isLoading.vod ? <div className="text-center py-10 text-gray-400">Cargando VODs...</div> : videos && videos.length > 0 ? ( <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar"> {videos.map(vid => ( <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 hover:bg-gray-600/80 transition-colors rounded-md gap-3"> <img src={vid.logo || vid.thumbnail || '/img/placeholder-thumbnail.png'} alt={vid.title || 'logo'} className="w-16 h-24 object-cover bg-black rounded-sm mr-0 sm:mr-3 flex-shrink-0 self-center sm:self-start border border-gray-600" onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}/> <div className="flex-grow mb-2 sm:mb-0 text-sm min-w-0 text-center sm:text-left"> <strong className={`text-base block truncate ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`} title={vid.title || "Sin Título"}>{vid.title || "Sin Título"} <span className="text-xs text-gray-400">({vid.tipo || 'N/A'})</span></strong> <p className="text-xs text-gray-400 truncate" title={vid.url}>{vid.url}</p> <p className="text-xs text-gray-500">Sección VOD: <span className="text-gray-400">{MAIN_SECTION_VOD_OPTIONS.find(s=>s.key === vid.mainSection)?.displayName || vid.mainSection || 'N/A'}</span></p> <p className="text-xs text-gray-500"> Planes VOD: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span> </p> <p className="text-xs text-gray-500">Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span></p> <p className="text-xs text-gray-500">{vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}</p> </div> <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 flex-shrink-0 self-center sm:self-auto w-full sm:w-auto justify-around sm:justify-start"> <Button onClick={() => handleEditVodClick(vid)} className="flex-1 sm:flex-none bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1.5">Editar</Button> <Button onClick={() => handleDeleteVodClick(vid.id || vid._id, vid.title)} isLoading={isSubmitting} className="flex-1 sm:flex-none bg-red-500 hover:bg-red-400 text-xs px-3 py-1.5">Eliminar</Button> </div> </div> ))} </div> ) : <p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay VODs para mostrar." : ""}</p>} </section> )}{/* Paginación al final de la lista de VODs */}
+{vodTotalPages > 1 && (
+  <div className="flex justify-center flex-wrap gap-2 mt-6">
+    <button
+      onClick={() => {
+        if (vodCurrentPage > 1) {
+          setVodCurrentPage(prev => prev - 1);
+          fetchVideosList(vodCurrentPage - 1, vodSearchTerm);
+        }
+      }}
+      disabled={vodCurrentPage === 1}
+      className={`px-3 py-1.5 rounded-md text-sm font-semibold ${vodCurrentPage === 1 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+    >
+      ◀ Anterior
+    </button>
+
+    {Array.from({ length: vodTotalPages }, (_, idx) => idx + 1).map(num => (
+      <button
+        key={num}
+        onClick={() => {
+          setVodCurrentPage(num);
+          fetchVideosList(num, vodSearchTerm);
+        }}
+        className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
+      >
+        {num}
+      </button>
+    ))}
+
+    <button
+      onClick={() => {
+        if (vodCurrentPage < vodTotalPages) {
+          setVodCurrentPage(prev => prev + 1);
+          fetchVideosList(vodCurrentPage + 1, vodSearchTerm);
+        }
+      }}
+      disabled={vodCurrentPage === vodTotalPages}
+      className={`px-3 py-1.5 rounded-md text-sm font-semibold ${vodCurrentPage === vodTotalPages ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+    >
+      Siguiente ▶
+    </button>
+  </div>
+)}
+
 
       {/* --- PESTAÑA: GESTIONAR USUARIOS --- */}
       {activeTab === "manage_users" && (
