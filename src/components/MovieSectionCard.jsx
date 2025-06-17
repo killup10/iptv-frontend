@@ -55,7 +55,7 @@ const MovieSectionCard = ({ section, onClick, userPlan, moviesInSection = [] }) 
     if (hasAccess) {
       onClick(section.key);
     } else {
-      alert(`Necesitas un plan '${section.requiresPlan}' o superior para acceder a "${section.displayName}". Tu plan actual es '${userPlan}'.`);
+      alert(`"${section.displayName}" está disponible para planes PREMIUM o CINÉFILO. Compra o actualiza tu membresía para acceder.`);
     }
   };
 

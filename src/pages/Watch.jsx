@@ -21,6 +21,8 @@ export function Watch() {
   const videoAreaRef = useRef(null);
   const isContinueWatching = location.state?.continueWatching === true;
   const startTimeFromState = location.state?.startTime || 0;
+    const [startTime, setStartTime] = useState(startTimeFromState);
+
 
   // --- 2. USEREF PARA GUARDAR LA ÚLTIMA POSICIÓN Y EVITAR RE-RENDERS ---
   const lastSavedTimeRef = useRef(0);
@@ -73,14 +75,15 @@ export function Watch() {
           throw new Error("No se recibieron datos del backend.");
         }
         const normalizedData = {
-          id: data._id || data.id,
-          name: data.name || data.title || data.titulo || "Sin título",
-          url: data.url,
-          description: data.description || data.descripcion || "",
-          releaseYear: data.releaseYear,
-          tipo: data.tipo || itemType,
-          chapters: Array.isArray(data.chapters) ? data.chapters : []
-        };
+          id: data._id || data.id,
+          name: data.name || data.title || data.titulo || "Sin título",
+          url: data.url,
+          description: data.description || data.descripcion || "",
+          releaseYear: data.releaseYear,
+          tipo: data.tipo || itemType,
+          chapters: Array.isArray(data.chapters) ? data.chapters : [],
+          watchProgress: data.watchProgress || null
+        };
         if (process.env.NODE_ENV === "development") {
           console.log("[Watch.jsx] Datos normalizados:", normalizedData);
         }
@@ -93,6 +96,22 @@ export function Watch() {
     };
     fetchItemDetails();
   }, [itemId, itemType]);
+
+  // Cargar progreso guardado si no viene desde el estado
+  useEffect(() => {
+    async function loadSavedProgress() {
+      if (startTimeFromState > 0 || !itemId || itemType === 'channel') return;
+      try {
+        const progress = await videoProgressService.getProgress(itemId);
+        if (progress?.lastTime) {
+          setStartTime(progress.lastTime);
+        }
+      } catch (err) {
+        console.error('[Watch.jsx] Error cargando progreso:', err);
+      }
+    }
+    loadSavedProgress();
+  }, [itemId, itemType, startTimeFromState]);
 
   // 2) Cuando tenemos itemData, calculamos la URL reproducible
   useEffect(() => {
@@ -143,7 +162,7 @@ export function Watch() {
       console.log('[Watch.jsx] Iniciando MPV con URL:', videoUrl);
     }
     
-    window.electronMPV.play(videoUrl, bounds, { startTime: startTimeFromState })
+    window.electronMPV.play(videoUrl, bounds, { startTime })
       .catch(err => {
         console.error('[Watch.jsx] Error al iniciar MPV:', err);
         setError(`Error al iniciar el reproductor: ${err.message}`);
@@ -180,7 +199,7 @@ export function Watch() {
         window.electronAPI.removeListener('mpv-time-pos', handleTimePos);
       }
     };
-  }, [videoUrl, bounds, startTimeFromState, throttledSaveProgress]); // Añadir dependencias
+  }, [videoUrl, bounds, startTime, throttledSaveProgress]); // Añadir dependencias
 
   // 5) Suscribirse a petición de sincronización de bounds
   useEffect(() => {
@@ -316,6 +335,7 @@ export function Watch() {
                 chapters={itemData.chapters}
                 serieId={itemData.id}
                 currentChapter={location.state?.chapterIndex || 0}
+                watchProgress={itemData.watchProgress}
               />
             )}
           </div>

@@ -7,6 +7,9 @@ import {
   fetchAdminVideos, createAdminVideo, updateAdminVideo, deleteAdminVideo,
   fetchAdminUsers, updateAdminUserPlan, updateAdminUserStatus
 } from "@/utils/api.js";
+import AdminUserDevices from "@/components/admin/AdminUserDevices.jsx";
+
+
 
 // --- Componentes UI ---
 const Tab = ({ label, value, activeTab, onTabChange, disabled = false }) => (
@@ -94,10 +97,10 @@ const Button = ({ children, className, disabled, isLoading, ...props }) => (
 );
 
 const MAIN_SECTION_VOD_OPTIONS = [
-  { key: "POR_GENERO", displayName: "POR GÉNEROS (Agrupador)"},
+  { key: "POR_GENERO", displayName: "POR GÉNEROS"},
   { key: "ESPECIALES", displayName: "ESPECIALES (Festividades)"},
   { key: "CINE_2025", displayName: "CINE 2025 (Estrenos)"},
-  { key: "CINE_4K", displayName: "CINE 4K"},
+  { key: "CINE_4K", displayName: "CINE 4K UHD"},
   { key: "CINE_60FPS", displayName: "CINE 60 FPS"},
 ];
 
@@ -296,40 +299,48 @@ export default function AdminPanel() {
   const [vodTotalPages, setVodTotalPages] = useState(1);
   const [vodTotalCount, setVodTotalCount] = useState(0);
   const [vodSearchTerm, setVodSearchTerm] = useState("");
+    const [vodFilterTipo, setVodFilterTipo] = useState("");
+    const fetchVideosList = useCallback(
 
-  const fetchVideosList = useCallback(
-  async (page = vodCurrentPage, search = vodSearchTerm) => {
-    setIsLoading(prev => ({ ...prev, vod: true }));
-    clearMessages();
-    try {
-      const params = { view: 'admin', page, limit: VODS_PER_PAGE, search: search.trim() };
-      const response = await axiosInstance.get("/api/videos", { params });
-      const data = response.data;
-      console.log("Respuesta del backend:", data);
+     async (
+      requestedPage = vodCurrentPage,
+      search = vodSearchTerm,
+      tipo = vodFilterTipo
+    ) => {
+      setIsLoading(prev => ({ ...prev, vod: true }));
+      clearMessages();
+      try {
+        const pageNum = parseInt(requestedPage, 10) || 1;
+        const params = { view: 'admin', limit: VODS_PER_PAGE };
+        params.skip = (pageNum - 1) * VODS_PER_PAGE;
+        if (search.trim()) params.search = search.trim();
+        if (tipo) params.tipo = tipo;
+        const response = await axiosInstance.get('/api/videos', { params });
+        const data = response.data;
+        console.log('Respuesta del backend:', data);
 
-      setVideos(data.videos || []);
-      setVodCurrentPage(data.page || page);
+        setVideos(Array.isArray(data.videos) ? data.videos : []);
+        setVodCurrentPage(pageNum);
 
-      // Ajuste clave: si no viene pages del backend, lo calculamos
-      const totalCount = data.total || 0;
-      const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
-      setVodTotalCount(totalCount);
-      setVodTotalPages(data.pages || calculatedPages);
+        const totalCount = data.total || 0;
+        const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
+        setVodTotalCount(totalCount);
+        setVodTotalPages(calculatedPages);
 
-      if (!data.videos || data.videos.length === 0) {
-        setSuccessMsg("No se encontraron VODs con los criterios actuales.");
-      }
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || "Fallo al cargar VODs.");
-      setVideos([]);
-      setVodTotalPages(1);
-      setVodTotalCount(0);
-    } finally {
-      setIsLoading(prev => ({ ...prev, vod: false }));
-    }
-  },
-  [vodSearchTerm, clearMessages] // IMPORTANTE: se elimina vodCurrentPage del array de dependencias
-);
+        if (!data.videos || data.videos.length === 0) {
+          setSuccessMsg('No se encontraron VODs con los criterios actuales.');
+        }
+      } catch (err) {
+        setErrorMsg(err.response?.data?.message || err.message || 'Fallo al cargar VODs.');
+        setVideos([]);
+        setVodTotalPages(1);
+        setVodTotalCount(0);
+      } finally {
+        setIsLoading(prev => ({ ...prev, vod: false }));
+     }
+     },
+    [vodSearchTerm, vodFilterTipo, clearMessages]
+  );
   
   const clearVodForm = useCallback(() => { 
     setVodId(null); 
@@ -694,8 +705,8 @@ export default function AdminPanel() {
   onSubmit={e => {
     e.preventDefault();
     setVodCurrentPage(1);
-    fetchVideosList(1, vodSearchTerm);
-  }}
+        fetchVideosList(1, vodSearchTerm, vodFilterTipo);
+}}
   className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4"
 >
   <Input
@@ -705,6 +716,19 @@ export default function AdminPanel() {
     onChange={e => setVodSearchTerm(e.target.value)}
     className="w-full sm:max-w-xs"
   />
+   <Select
+    value={vodFilterTipo}
+    onChange={e => setVodFilterTipo(e.target.value)}
+    className="w-full sm:max-w-xs"
+  >
+    <option value="">Todos</option>
+    <option value="pelicula">Película</option>
+    <option value="serie">Serie</option>
+    <option value="anime">Anime</option>
+    <option value="dorama">Dorama</option>
+    <option value="novela">Novela</option>
+    <option value="documental">Documental</option>
+  </Select>
   <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
     Buscar
   </Button>
@@ -718,8 +742,8 @@ export default function AdminPanel() {
         key={num}
         onClick={() => {
           setVodCurrentPage(num);
-          fetchVideosList(num);
-        }}
+         fetchVideosList(num, vodSearchTerm, vodFilterTipo);
+       }}
         className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
       >
         {num}
@@ -737,7 +761,7 @@ export default function AdminPanel() {
       onClick={() => {
         if (vodCurrentPage > 1) {
           setVodCurrentPage(prev => prev - 1);
-          fetchVideosList(vodCurrentPage - 1, vodSearchTerm);
+          fetchVideosList(vodCurrentPage - 1, vodSearchTerm, vodFilterTipo);
         }
       }}
       disabled={vodCurrentPage === 1}
@@ -751,7 +775,7 @@ export default function AdminPanel() {
         key={num}
         onClick={() => {
           setVodCurrentPage(num);
-          fetchVideosList(num, vodSearchTerm);
+          fetchVideosList(num, vodSearchTerm, vodFilterTipo);
         }}
         className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
       >
@@ -763,7 +787,7 @@ export default function AdminPanel() {
       onClick={() => {
         if (vodCurrentPage < vodTotalPages) {
           setVodCurrentPage(prev => prev + 1);
-          fetchVideosList(vodCurrentPage + 1, vodSearchTerm);
+          fetchVideosList(vodCurrentPage + 1, vodSearchTerm, vodFilterTipo);
         }
       }}
       disabled={vodCurrentPage === vodTotalPages}
@@ -777,61 +801,53 @@ export default function AdminPanel() {
 
       {/* --- PESTAÑA: GESTIONAR USUARIOS --- */}
       {activeTab === "manage_users" && (
-        <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl">
-          <h2 className="text-2xl font-semibold mb-6 text-center sm:text-left">Gestionar Usuarios</h2>
-          {isLoading.users ? (<div className="text-center py-10 text-gray-400">Cargando usuarios...</div>)
-          : (adminUsers && adminUsers.length > 0) ? (
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="min-w-full divide-y divide-gray-700">
-                <thead className="bg-gray-750">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Usuario</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Plan Actual</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nuevo Plan</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Estado</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Acción Estado</th>
-                    {/* Podrías añadir más columnas como Fecha de Expiración, Fecha de Creación */}
-                  </tr>
-                </thead>
-                <tbody className="bg-gray-800 divide-y divide-gray-700">
-                  {adminUsers.map((usr) => (
-                    <tr key={usr._id} className="hover:bg-gray-700/50 transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-white">{usr.username} ({usr.role})</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">{ALL_AVAILABLE_PLANS.find(p => p.key === (usr.plan === "basico" ? "gplay" : usr.plan))?.displayName || usr.plan}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <Select
-                          value={usr.plan === "basico" ? "gplay" : usr.plan} // Asegura que 'gplay' se muestre si el plan es 'basico'
-                          onChange={(e) => handleUserPlanChange(usr._id, e.target.value)}
-                          disabled={isSubmitting}
-                          className="text-xs py-1.5 bg-gray-700" // Estilo consistente
-                        >
-                          {ALL_AVAILABLE_PLANS.map(plan => (
-                            <option key={plan.key} value={plan.key}>{plan.displayName}</option>
-                          ))}
-                        </Select>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${usr.isActive ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100'}`}>
-                          {usr.isActive ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <Button
-                          onClick={() => handleUserStatusChange(usr._id, usr.isActive)}
-                          isLoading={isSubmitting}
-                          className={`text-xs px-3 py-1.5 ${usr.isActive ? "bg-yellow-600 hover:bg-yellow-700" : "bg-green-600 hover:bg-green-700"}`}
-                        >
-                          {usr.isActive ? "Desactivar" : "Activar"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl">
+      <h2 className="text-2xl font-semibold mb-6 text-center sm:text-left">Gestionar Usuarios</h2>
+      {isLoading.users ? (
+        <div className="text-center py-10 text-gray-400">Cargando usuarios...</div>
+      ) : (adminUsers && adminUsers.length > 0) ? (
+        <div className="space-y-8">
+          {adminUsers.map((usr) => (
+            <div key={usr._id} className="bg-gray-700 rounded-lg p-4">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center">
+                <div>
+                  <p className="text-white font-semibold text-lg">{usr.username} ({usr.role})</p>
+                  <p className="text-gray-400 text-sm mb-2">Plan actual: {ALL_AVAILABLE_PLANS.find(p => p.key === (usr.plan === "basico" ? "gplay" : usr.plan))?.displayName || usr.plan}</p>
+                  <Select
+                    value={usr.plan === "basico" ? "gplay" : usr.plan}
+                    onChange={(e) => handleUserPlanChange(usr._id, e.target.value)}
+                    disabled={isSubmitting}
+                    className="text-xs py-1.5 bg-gray-700"
+                  >
+                    {ALL_AVAILABLE_PLANS.map(plan => (
+                      <option key={plan.key} value={plan.key}>{plan.displayName}</option>
+                    ))}
+                  </Select>
+                  <div className="mt-2">
+                    <span className={`px-2 py-1 text-xs rounded-full font-semibold ${usr.isActive ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100'}`}>
+                      {usr.isActive ? "Activo" : "Inactivo"}
+                    </span>
+                    <Button
+                      onClick={() => handleUserStatusChange(usr._id, usr.isActive)}
+                      isLoading={isSubmitting}
+                      className={`ml-2 text-xs px-3 py-1.5 ${usr.isActive ? "bg-yellow-600 hover:bg-yellow-700" : "bg-green-600 hover:bg-green-700"}`}
+                    >
+                      {usr.isActive ? "Desactivar" : "Activar"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <AdminUserDevices userId={usr._id} username={usr.username} />
+              </div>
             </div>
-          ) : (<p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay usuarios para mostrar." : ""}</p>)}
-        </section>
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay usuarios para mostrar." : ""}</p>
       )}
+    </section>
+  )}
       {/* --- FIN PESTAÑA USUARIOS --- */}
 
       {/* Pestaña: Carga Masiva VOD */}

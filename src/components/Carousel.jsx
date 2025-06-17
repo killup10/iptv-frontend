@@ -17,15 +17,23 @@ export default function Carousel({ title, items = [], onItemClick, itemType = 'i
         className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 pl-1 pr-1 hide-scrollbar [&>*]:w-[120px] sm:[&>*]:w-[150px] md:[&>*]:w-[180px]"
         aria-label={`Carrusel de ${title}`}
       >
-        {items.map((item) => (
-          <Card
-            key={item.id || item._id}
-            item={item}
-            onClick={onItemClick} 
-            itemType={itemType}
-            onPlayTrailer={onPlayTrailerClick} // Pasa la prop onPlayTrailerClick a Card (Card la espera como onPlayTrailer)
-          />
-        ))}
+         {items.map((item) => {
+          const progressPercent =
+            typeof item.progressTime === 'number' && item.duration
+              ? (item.progressTime / item.duration) * 100
+              : undefined;
+
+          return (
+            <Card
+              key={item.id || item._id}
+              item={item}
+              onClick={onItemClick}
+              itemType={itemType}
+              onPlayTrailer={onPlayTrailerClick} // Pasa la prop onPlayTrailerClick a Card (Card la espera como onPlayTrailer)
+              progressPercent={progressPercent}
+            />
+          );
+        })}
       </div>
     </section>
   );

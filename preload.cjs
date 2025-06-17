@@ -78,13 +78,13 @@ try {
      * Suscribirse a errores de MPV
      */
     on: (channel, callback) => {
-      if (channel === 'mpv-error') {
+      if (channel === 'mpv-error' || channel === 'mpv-time-pos') {
         ipcRenderer.on(channel, callback);
       }
     },
     removeListener: (channel, callback) => {
-      if (channel === 'mpv-error') {
-        ipcRenderer.removeListener(channel, callback);
+            if (channel === 'mpv-error' || channel === 'mpv-time-pos') {
+            ipcRenderer.removeListener(channel, callback);
       }
     }
   });

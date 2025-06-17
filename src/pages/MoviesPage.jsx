@@ -10,25 +10,26 @@ const getUniqueValuesFromArray = (items, field) => {
     if (!items || items.length === 0) return ['Todas'];
     const values = items.flatMap(item => {
         const fieldValue = item[field];
-        if (Array.isArray(fieldValue)) {
-            return fieldValue;
-        }
+        if (Array.isArray(fieldValue)) return fieldValue;
         return fieldValue ? [fieldValue] : [];
     }).filter(Boolean);
     return ['Todas', ...new Set(values.sort((a,b) => a.localeCompare(b)))];
 };
 
+const isSectionAllowedForPlan = (sectionKey, userPlan) => {
+    const restricciones = {
+        "CINE_4K": ["cinefilo", "premium"],
+        "CINE_60FPS": ["cinefilo", "premium"],
+        "CINE_2025": ["cinefilo", "premium"],
+        "TV_EN_VIVO": ["premium"],
+        "DORAMAS": ["estandar", "cinefilo", "premium"]
+    };
+    if (!restricciones[sectionKey]) return true;
+    return restricciones[sectionKey].includes(userPlan);
+};
+
 export default function MoviesPage() {
     const [specialEvents, setSpecialEvents] = useState([]);
-
-    const shouldShowSpecialsSection = () => {
-        return specialEvents.length > 0;
-    };
-
-    const getSpecialEventName = () => {
-        return specialEvents[0]?.specialEventName || "Especial";
-    };
-
     const { user } = useAuth();
     const navigate = useNavigate();
     const [allUserMovies, setAllUserMovies] = useState([]);
@@ -39,6 +40,9 @@ export default function MoviesPage() {
     const [genresForSelectedSection, setGenresForSelectedSection] = useState(['Todas']);
     const [selectedGenre, setSelectedGenre] = useState('Todas');
     const [searchTerm, setSearchTerm] = useState('');
+
+    const shouldShowSpecialsSection = () => specialEvents.length > 0;
+    const getSpecialEventName = () => specialEvents[0]?.specialEventName || "Especial";
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -54,22 +58,12 @@ export default function MoviesPage() {
                     fetchUserMovies(),
                     fetchMainMovieSections()
                 ]);
-                
-                // --- FIX AQUÍ ---
-                // La API ahora devuelve un objeto { videos: [...] }. Extraemos el array.
-                setAllUserMovies(moviesData.videos || []);
-
+                setAllUserMovies(moviesData || []);
                 let filteredSections = sectionsDataFromAPI || [];
                 if (!shouldShowSpecialsSection()) {
                     filteredSections = filteredSections.filter(section => section.key !== "ESPECIALES");
                 }
                 setMainSections(filteredSections);
-
-                if (filteredSections?.length === 1 && filteredSections[0].key === "POR_GENERO") {
-                    setSelectedMainSectionKey("POR_GENERO");
-                } else if (filteredSections?.length === 0 && (moviesData.videos && moviesData.videos.length > 0)) {
-                    setSelectedMainSectionKey("POR_GENERO");
-                }
             } catch (err) {
                 console.error("MoviesPage: Error cargando datos iniciales:", err);
                 setError(err.message || "No se pudieron cargar los datos de películas.");
@@ -86,67 +80,70 @@ export default function MoviesPage() {
             setSelectedGenre('Todas');
             return;
         }
-        let moviesForGenreExtraction = [];
-        if (selectedMainSectionKey === "POR_GENERO") {
-            moviesForGenreExtraction = allUserMovies.filter(m => m.mainSection === "POR_GENERO" || !m.mainSection);
-        } else {
-            moviesForGenreExtraction = allUserMovies.filter(m => m.mainSection === selectedMainSectionKey);
-        }
+        const moviesForGenreExtraction = allUserMovies.filter(m =>
+            selectedMainSectionKey === "POR_GENERO"
+                ? m.mainSection === "POR_GENERO" || !m.mainSection
+                : m.mainSection === selectedMainSectionKey
+        );
         setGenresForSelectedSection(getUniqueValuesFromArray(moviesForGenreExtraction, 'genres'));
         setSelectedGenre('Todas');
         setSearchTerm('');
     }, [selectedMainSectionKey, allUserMovies]);
 
     const displayedMovies = useMemo(() => {
-        if (!selectedMainSectionKey && mainSections.length > 0) {
-            if (!(mainSections.length === 1 && mainSections[0].key === "POR_GENERO")) {
-                return [];
-            }
-        }
-        
-        let filtered = allUserMovies;
-
+        let filtered = [...allUserMovies];
         if (selectedMainSectionKey) {
-            if (selectedMainSectionKey === "POR_GENERO") {
-                filtered = filtered.filter(m => m.mainSection === "POR_GENERO" || !m.mainSection);
-            } else {
-                filtered = filtered.filter(m => m.mainSection === selectedMainSectionKey);
-            }
+            filtered = filtered.filter(m =>
+                selectedMainSectionKey === "POR_GENERO"
+                    ? m.mainSection === "POR_GENERO" || !m.mainSection
+                    : m.mainSection === selectedMainSectionKey
+            );
         }
-        
         if (selectedGenre !== 'Todas') {
-            filtered = filtered.filter(m => 
-                (Array.isArray(m.genres) && m.genres.map(g => g.toLowerCase()).includes(selectedGenre.toLowerCase())) || 
+            filtered = filtered.filter(m =>
+                (Array.isArray(m.genres) && m.genres.map(g => g.toLowerCase()).includes(selectedGenre.toLowerCase())) ||
                 (typeof m.genres === 'string' && m.genres.toLowerCase() === selectedGenre.toLowerCase())
             );
         }
-
         if (searchTerm) {
-            filtered = filtered.filter(m => 
+            filtered = filtered.filter(m =>
                 (m.title && m.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (m.name && m.name.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
         return filtered;
-    }, [allUserMovies, selectedMainSectionKey, selectedGenre, searchTerm, mainSections]);
+    }, [allUserMovies, selectedMainSectionKey, selectedGenre, searchTerm]);
 
     const handleMovieClick = (movie) => {
         const movieId = movie.id || movie._id;
-        if (!movieId) { 
+        if (!movieId) {
             console.error("MoviesPage: Clic en película sin ID válido.", movie);
-            return; 
+            return;
         }
         navigate(`/watch/movie/${movieId}`);
     };
-    
+
     const handleSelectMainSection = (sectionKey) => {
+        const planUsuario = user?.plan || "gratuito";
+        if (!isSectionAllowedForPlan(sectionKey, planUsuario)) {
+            const requerido = sectionKey.includes("CINE") ? "Cinéfilo o Premium" : "un plan superior";
+            setError(`🎬 Estimado cliente, debe tener el plan ${requerido} para acceder a esta sección.`);
+            setTimeout(() => setError(null), 5000);
+            return;
+        }
         setSelectedMainSectionKey(sectionKey);
-        setSelectedGenre('Todas'); 
+        setSelectedGenre('Todas');
+        setSearchTerm('');
     };
 
-    if (isLoading) return <div className="flex justify-center items-center min-h-[calc(100vh-128px)]"><div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-600"></div></div>;
-    if (error) return <p className="text-center text-red-400 p-6 text-lg bg-gray-800 rounded-md mx-auto max-w-md">{error}</p>;
-    if (!user) return <p className="text-center text-xl text-gray-400 mt-20">Debes <a href="/login" className="text-red-500 hover:underline">iniciar sesión</a> para ver este contenido.</p>;
+    if (isLoading)
+        return <div className="flex justify-center items-center min-h-[calc(100vh-128px)]"><div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-600"></div></div>;
+
+    if (error)
+        return <p className="text-center text-red-400 p-6 text-lg bg-gray-800 rounded-md mx-auto max-w-md">{error}</p>;
+
+    if (!user)
+        return <p className="text-center text-xl text-gray-400 mt-20">Debes <a href="/login" className="text-red-500 hover:underline">iniciar sesión</a> para ver este contenido.</p>;
 
     if (!selectedMainSectionKey) {
         return (
@@ -156,14 +153,16 @@ export default function MoviesPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         {mainSections.map(section => {
                             if (section.key === "ESPECIALES" && !shouldShowSpecialsSection()) return null;
-                            const sectionData = section.key === "ESPECIALES" ? { ...section, displayName: getSpecialEventName() } : section;
+                            const sectionData = section.key === "ESPECIALES"
+                                ? { ...section, displayName: getSpecialEventName() }
+                                : section;
                             return (
-                                <MovieSectionCard 
-                                    key={sectionData.key} 
-                                    section={sectionData} 
+                                <MovieSectionCard
+                                    key={sectionData.key}
+                                    section={sectionData}
                                     onClick={handleSelectMainSection}
-                                    userPlan={user.plan || 'gplay'}
-                                    moviesInSection={allUserMovies.filter(m => m.mainSection === sectionData.key || (sectionData.key === "POR_GENERO" && (!m.mainSection || m.mainSection === "POR_GENERO"))).slice(0, 15)}
+                                    userPlan={user.plan || 'gratuito'}
+                                    moviesInSection={[]} // ya no filtra por películas visibles
                                 />
                             );
                         })}
@@ -181,12 +180,12 @@ export default function MoviesPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
                 <div className="flex items-center">
-                    <button 
-                        onClick={() => { setSelectedMainSectionKey(null); setSearchTerm(''); }} 
+                    <button
+                        onClick={() => { setSelectedMainSectionKey(null); setSearchTerm(''); }}
                         className="mr-3 text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 transition-colors"
                         title="Volver a Secciones"
                     >
-                        <ChevronLeftIcon className="w-6 h-6 sm:w-7 sm:w-7" />
+                        <ChevronLeftIcon className="w-6 h-6 sm:w-7 sm:h-7" />
                     </button>
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
                         {currentMainSection?.displayName || "Películas"}
@@ -200,7 +199,7 @@ export default function MoviesPage() {
                     className="w-full md:w-1/3 lg:w-1/4 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-shadow"
                 />
             </div>
-            
+
             {genresForSelectedSection.length > 1 && (
                 <div className="flex flex-wrap gap-2 mb-8 pb-4 border-b border-gray-700">
                     {genresForSelectedSection.map(genre => (

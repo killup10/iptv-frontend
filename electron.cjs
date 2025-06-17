@@ -2,10 +2,18 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const net = require('net');
 
 let mainWindow = null;
 let mpvProcess = null;
+let mpvIpcSocket = null;
 const isDev = process.env.NODE_ENV === 'development';
+function getMpvIpcPath() {
+  if (process.platform === 'win32') {
+    return `\\\\.\\pipe\\mpv-socket-${process.pid}`;
+  }
+  return path.join(app.getPath('temp'), `mpv-socket-${process.pid}`);
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -170,6 +178,8 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
 
         // 4) Construir argumentos de MPV
         const args = [];
+                const ipcPath = getMpvIpcPath();
+
         
         // Configuración mínima necesaria
         args.push('--title=TeamG Play');       // Título de la ventana
@@ -182,7 +192,8 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
         args.push('--gpu-api=d3d11');         // API de GPU
         args.push('--hwdec=auto-safe');       // Decodificación por hardware
         args.push('--cache=yes');             // Habilitar caché
-        
+        args.push(`--input-ipc-server=${ipcPath}`);
+
         // URL del video
         args.push('--');  // Separador para evitar confusión con URLs que empiezan con guión
         args.push(url);
@@ -211,6 +222,38 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
           mpvProcess.on('spawn', () => {
             console.log('[MPV] Proceso iniciado correctamente');
             clearTimeout(timeout);
+            
+            // Conectar al socket IPC de MPV para observar el tiempo de reproducci\xC3\xB3n
+            try {
+              mpvIpcSocket = net.createConnection(ipcPath, () => {
+                const msg = JSON.stringify({ command: ['observe_property', 1, 'time-pos'] }) + '\n';
+                mpvIpcSocket.write(msg);
+              });
+              mpvIpcSocket.on('data', (data) => {
+                const lines = data.toString().split('\n');
+                lines.forEach(line => {
+                  if (!line.trim()) return;
+                  try {
+                    const parsed = JSON.parse(line);
+                    if (parsed.event === 'property-change' && parsed.name === 'time-pos') {
+                      if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('mpv-time-pos', parsed.data);
+                      }
+                    }
+                  } catch (err) {
+                    console.error('[MPV IPC] Error parsing:', err);
+                  }
+                });
+              });
+              mpvIpcSocket.on('error', err => {
+                console.error('[MPV IPC] Socket error:', err);
+              });
+              mpvIpcSocket.on('close', () => {
+                mpvIpcSocket = null;
+              });
+            } catch (ipcErr) {
+              console.error('[MPV IPC] No se pudo conectar al socket:', ipcErr);
+            }
             resolve();
           });
 
@@ -287,6 +330,10 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
           if (code !== 0) {
             sendMpvError(exitMsg);
           }
+          if (mpvIpcSocket) {
+            mpvIpcSocket.destroy();
+            mpvIpcSocket = null;
+          }
           mpvProcess = null;
         });
       } catch (err) {
@@ -317,6 +364,10 @@ ipcMain.handle('mpv-embed-stop', async () => {
       console.log('[MPV] Proceso detenido correctamente');
     }
     mpvProcess = null;
+    if (mpvIpcSocket) {
+      mpvIpcSocket.destroy();
+      mpvIpcSocket = null;
+    }
     return { success: true };
   } catch (error) {
     console.error('[MPV] Error al detener el proceso:', error);

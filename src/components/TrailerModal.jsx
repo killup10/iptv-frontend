@@ -42,7 +42,9 @@ const TrailerModal = ({ trailerUrl, onClose }) => {
 
   const youtubeId = getYouTubeId(trailerUrl);
   // Construir URL de embed de YouTube con autoplay, sin videos relacionados y permitiendo fullscreen
-  const youtubeEmbedUrl = youtubeId ? `https://www.youtube.com/watch?v=9pyD9dZI3XA{youtubeId}?autoplay=1&rel=0&modestbranding=1&fs=1` : null;
+   const youtubeEmbedUrl = youtubeId
+    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1&fs=1`
+    : null;
 
   // console.log("TrailerModal: trailerUrl original:", trailerUrl);
   // console.log("TrailerModal: youtubeId extraído:", youtubeId);
