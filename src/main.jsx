@@ -10,7 +10,6 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Importar Páginas
 import Home from './pages/Home.jsx';
-import Login from './pages/Login.jsx';
 // import Register from './pages/Register.jsx'; // Si tienes registro
 import AdminPanel from './pages/AdminPanel.jsx';
 import Watch from './pages/Watch.jsx'; // Página de reproducción
@@ -33,8 +32,8 @@ const router = createHashRouter([
     path: "/", // En HashRouter, esto se traduce a la ruta base (ej. index.html#/)
     element: <AppLayout />,
     children: [
-      { index: true, element: <Home /> },
-      { path: "login", element: <Login /> },
+      { path: "login", element: <Home /> },
+      { index: true, element: <ProtectedRoute><Home /></ProtectedRoute> },
       // { path: "register", element: <Register /> },
       {
         path: "admin",
@@ -61,7 +60,7 @@ const router = createHashRouter([
         ),
       },
       {
-        path: "movies",
+        path: "peliculas",
         element: (
           <ProtectedRoute>
             <MoviesPage />

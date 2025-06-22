@@ -7,29 +7,48 @@ import {
   fetchFeaturedChannels,
   fetchFeaturedMovies,
   fetchFeaturedSeries,
-  fetchContinueWatching, // 1. CORRECCIÓN: Importar la función correcta
+  fetchContinueWatching,
 } from '../utils/api.js';
 import TrailerModal from '../components/TrailerModal.jsx';
 
 export function Home() {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  
+  // State for login form
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // State for content
   const [featuredChannels, setFeaturedChannels] = useState([]);
   const [featuredMovies, setFeaturedMovies] = useState([]);
   const [featuredSeries, setFeaturedSeries] = useState([]);
   const [continueWatchingItems, setContinueWatchingItems] = useState([]);
-  const [error, setError] = useState(null);
+  const [contentError, setContentError] = useState(null);
 
+  // State for trailer modal
   const [showTrailerModal, setShowTrailerModal] = useState(false);
   const [currentTrailerUrl, setCurrentTrailerUrl] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      await login({ username, password });
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    } catch (err) {
+      setLoginError(err.message || 'Error al iniciar sesión');
+    }
+  };
 
   useEffect(() => {
     async function loadInitialData() {
       setLoading(true);
-      setError(null);
+      setContentError(null);
       try {
-        // Obtenemos todo el contenido destacado y la lista de "Continuar Viendo" en paralelo
         const results = await Promise.allSettled([
           fetchContinueWatching(),
           fetchFeaturedChannels(),
@@ -44,41 +63,37 @@ export function Home() {
           seriesResult,
         ] = results;
 
-        // 2. OPTIMIZACIÓN: Procesar directamente la respuesta del backend
         if (continueWatchingResult.status === 'fulfilled' && Array.isArray(continueWatchingResult.value)) {
-          console.log('[Home.jsx] Items de "Continuar Viendo" cargados:', continueWatchingResult.value);
-          // El backend ya devuelve el formato correcto con el progreso incluido
           setContinueWatchingItems(continueWatchingResult.value);
         } else {
-          console.error('[Home.jsx] Error cargando "Continuar Viendo":', continueWatchingResult.reason);
+          console.error('[Home.jsx] Error loading "Continue Watching":', continueWatchingResult.reason);
           setContinueWatchingItems([]);
         }
         
         if (channelsResult.status === 'fulfilled' && Array.isArray(channelsResult.value)) {
           setFeaturedChannels(channelsResult.value.slice(0, 15));
         } else {
-          console.error('[Home.jsx] Error cargando canales destacados:', channelsResult.reason);
+          console.error('[Home.jsx] Error loading featured channels:', channelsResult.reason);
           setFeaturedChannels([]);
         }
 
         if (moviesResult.status === 'fulfilled' && Array.isArray(moviesResult.value)) {
-            console.log('🎥 Películas destacadas recibidas:', moviesResult.value); // 👈 AGREGA ESTO
           setFeaturedMovies(moviesResult.value.slice(0, 15));
         } else {
-          console.error('[Home.jsx] Error cargando películas destacadas:', moviesResult.reason);
+          console.error('[Home.jsx] Error loading featured movies:', moviesResult.reason);
           setFeaturedMovies([]);
         }
         
         if (seriesResult.status === 'fulfilled' && Array.isArray(seriesResult.value)) {
           setFeaturedSeries(seriesResult.value.slice(0, 15));
         } else {
-          console.error('[Home.jsx] Error cargando series destacadas:', seriesResult.reason);
+          console.error('[Home.jsx] Error loading featured series:', seriesResult.reason);
           setFeaturedSeries([]);
         }
 
       } catch (err) {
-        console.error('[Home.jsx] Error general en loadInitialData:', err);
-        setError(err.message || "Error al cargar contenido.");
+        console.error('[Home.jsx] General error in loadInitialData:', err);
+        setContentError(err.message || "Error loading content.");
       } finally {
         setLoading(false);
       }
@@ -92,29 +107,23 @@ export function Home() {
   }, [user]);
 
   const handleItemClick = (item, itemTypeFromCarousel) => {
-    console.log("[Home.jsx] handleItemClick - Item recibido:", JSON.parse(JSON.stringify(item)));
-    
-    // Prioriza el tipo del objeto, si no, usa el del carrusel
     const type = item.itemType || item.tipo || itemTypeFromCarousel;
     const id = item.id || item._id;
 
     if (!type || !id) {
-      console.error("[Home.jsx] handleItemClick: Tipo o ID del item no definido.", item);
-      alert("Error: No se pudo determinar el contenido a reproducir.");
+      console.error("[Home.jsx] handleItemClick: Item type or ID is undefined.", item);
+      alert("Error: Cannot determine the content to play.");
       return;
     }
 
-    // El backend para "Continuar Viendo" devuelve un objeto `watchProgress`
     const progress = item.watchProgress || {};
     const startTime = progress.lastTime || 0;
     
     const navigationState = {};
-    if (startTime > 5) { // Solo si el tiempo es significativo
-      console.log("[Home.jsx] handleItemClick: Añadiendo startTime a la navegación:", startTime);
+    if (startTime > 5) {
       navigationState.startTime = startTime;
     }
     
-    console.log(`[Home.jsx] Navegando a: /watch/${type}/${id} con estado:`, navigationState);
     navigate(`/watch/${type}/${id}`, { state: navigationState });
   };
 
@@ -129,22 +138,132 @@ export function Home() {
     return <div className="flex items-center justify-center min-h-[calc(100vh-5rem)]"><div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>;
   }
   
-  if (error) {
-      return <div className="text-center text-red-400 p-10 pt-24">Error al cargar contenido: {error}</div>;
+  if (contentError) {
+      return <div className="text-center text-red-400 p-10 pt-24">Error loading content: {contentError}</div>;
   }
   
-  if (!user && !loading) {
+  if (!user?.token && !loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-5rem)] text-center px-4 pt-20">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-4">Bienvenido a TeamG Play</h1>
-        <p className="text-lg text-gray-300 mb-8">Inicia sesión para descubrir un mundo de entretenimiento.</p>
-        <button
-          onClick={() => navigate('/login')}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform hover:scale-105"
+      <>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+
+          :root {
+            --background: 254 50% 5%;
+            --foreground: 210 40% 98%;
+            --primary: 190 100% 50%;
+            --primary-foreground: 254 50% 5%;
+            --secondary: 315 100% 60%;
+            --secondary-foreground: 210 40% 98%;
+            --muted-foreground: 190 30% 80%;
+            --card-background: 254 50% 8%;
+            --input-background: 254 50% 12%;
+            --input-border: 315 100% 25%;
+            --footer-text: 210 40% 70%;
+          }
+
+          body {
+            font-family: 'Inter', sans-serif;
+          }
+
+          .text-glow-primary {
+            text-shadow: 0 0 5px hsl(var(--primary) / 0.8), 0 0 10px hsl(var(--primary) / 0.6);
+          }
+          .text-glow-secondary {
+            text-shadow: 0 0 5px hsl(var(--secondary) / 0.8), 0 0 10px hsl(var(--secondary) / 0.6);
+          }
+          .shadow-glow-primary {
+            box-shadow: 0 0 25px hsl(var(--primary) / 0.8);
+          }
+          .drop-shadow-glow-logo {
+            filter: drop-shadow(0 0 25px hsl(var(--secondary) / 0.6)) drop-shadow(0 0 15px hsl(var(--primary) / 0.5));
+          }
+        `}</style>
+        <div 
+          className="relative min-h-screen w-full flex flex-col"
+          style={{
+          backgroundImage: "url('/fondo.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+          }}
         >
-          Iniciar Sesión
-        </button>
-      </div>
+          <main className="relative z-10 flex-grow flex flex-col md:flex-row items-center justify-center p-4">
+            <div className="hidden md:flex flex-col flex-1 p-8 lg:p-16 items-center justify-center text-center">
+                <h1 className="text-5xl font-black text-primary text-glow-primary mb-6">
+                    Bienvenido a
+                </h1>
+                <img 
+                  src="/TeamG Play.png" 
+                  alt="Logo de TeamG Play" 
+                  className="w-full max-w-xs drop-shadow-glow-logo" 
+                />
+                <p className="text-xl text-muted-foreground mt-4 max-w-md">
+                  Inicia sesión para descubrir un mundo de entretenimiento.
+                </p>
+            </div>
+            <div className="flex-1 w-full max-w-md p-4">
+              <div 
+                className="w-full p-8 rounded-2xl" 
+                style={{
+                  backgroundColor: 'hsl(var(--card-background) / 0.8)',
+                  border: '1px solid hsl(var(--input-border) / 0.5)'
+                }}
+              >
+                <h2 className="text-3xl font-black text-center text-primary text-glow-primary mb-8">
+                    Iniciar Sesión
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Usuario</label>
+                    <input 
+                      type="text" 
+                      placeholder="Tu nombre de usuario"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg text-foreground focus:outline-none focus:ring-2"
+                      style={{
+                        backgroundColor: 'hsl(var(--input-background))',
+                        border: '1px solid hsl(var(--input-border))',
+                        '--tw-ring-color': 'hsl(var(--primary))'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Contraseña</label>
+                    <input 
+                      type="password" 
+                      placeholder="Tu contraseña"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg text-foreground focus:outline-none focus:ring-2"
+                      style={{
+                        backgroundColor: 'hsl(var(--input-background))',
+                        border: '1px solid hsl(var(--input-border))',
+                        '--tw-ring-color': 'hsl(var(--primary))'
+                      }}
+                    />
+                  </div>
+                  {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-lg text-lg transition-all duration-300 transform hover:scale-105 shadow-glow-primary"
+                    style={{ backgroundColor: 'hsl(var(--primary))' }}
+                  >
+                    Entrar
+                  </button>
+                </form>
+                <p className="text-center text-sm text-muted-foreground mt-6">
+                  ¿No tienes cuenta?{' '}
+                  <a href="/register" className="font-medium text-secondary hover:underline text-glow-secondary">
+                    Regístrate aquí
+                  </a>
+                </p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </>
     );
   }
 
@@ -157,7 +276,7 @@ export function Home() {
               title="Continuar Viendo"
               items={continueWatchingItems}
               onItemClick={(item) => handleItemClick(item, item.itemType)}
-              itemType="movie" // Fallback, pero item.itemType debería existir
+              itemType="movie"
             />
           )}
           {featuredChannels.length > 0 && (
@@ -187,7 +306,7 @@ export function Home() {
             />
           )}
           
-          {user && !loading && !error &&
+          {user && !loading && !contentError &&
             featuredChannels.length === 0 &&
             featuredMovies.length === 0 &&
             featuredSeries.length === 0 &&

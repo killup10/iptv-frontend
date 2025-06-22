@@ -7,6 +7,34 @@ const net = require('net');
 let mainWindow = null;
 let mpvProcess = null;
 let mpvIpcSocket = null;
+// Helper para terminar de forma confiable el proceso de MPV
+async function forceKillMpv() {
+  return new Promise(resolve => {
+    if (!mpvProcess) {
+      return resolve();
+    }
+    const cleanup = () => {
+      if (mpvIpcSocket) {
+        mpvIpcSocket.destroy();
+        mpvIpcSocket = null;
+      }
+      mpvProcess = null;
+      resolve();
+    };
+    mpvProcess.once('exit', cleanup);
+    try {
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', mpvProcess.pid.toString(), '/f', '/t']);
+      } else {
+        mpvProcess.kill('SIGKILL');
+      }
+    } catch (err) {
+      console.error('[MPV] Error al forzar cierre:', err);
+      cleanup();
+    }
+    setTimeout(cleanup, 1000); // Respaldo por si no se emite 'exit'
+  });
+}
 const isDev = process.env.NODE_ENV === 'development';
 function getMpvIpcPath() {
   if (process.platform === 'win32') {
@@ -137,13 +165,11 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
     // 1) Si ya había un MPV corriendo, lo detenemos
     if (mpvProcess) {
       try {
-        mpvProcess.kill();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Esperar a que MPV se cierre
+        await forceKillMpv();
         console.log('[MPV] Proceso anterior detenido correctamente');
       } catch (err) {
         console.error('[MPV] Error al detener proceso anterior:', err);
-      } finally {
-        mpvProcess = null;
+      
       }
     }
 
@@ -359,15 +385,10 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
 ipcMain.handle('mpv-embed-stop', async () => {
   try {
     if (mpvProcess) {
-      mpvProcess.kill();
-      await new Promise(resolve => setTimeout(resolve, 100)); // Pequeña espera para asegurar que MPV se cierre
+      await forceKillMpv();
       console.log('[MPV] Proceso detenido correctamente');
     }
-    mpvProcess = null;
-    if (mpvIpcSocket) {
-      mpvIpcSocket.destroy();
-      mpvIpcSocket = null;
-    }
+    
     return { success: true };
   } catch (error) {
     console.error('[MPV] Error al detener el proceso:', error);

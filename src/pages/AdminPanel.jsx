@@ -4,7 +4,7 @@ import axiosInstance from "@/utils/axiosInstance.js";
 import {
   fetchAdminChannels, createAdminChannel, updateAdminChannel,
   deleteAdminChannel, processM3UForAdmin,
-  fetchAdminVideos, createAdminVideo, updateAdminVideo, deleteAdminVideo,
+  createAdminVideo, updateAdminVideo, deleteAdminVideo,
   fetchAdminUsers, updateAdminUserPlan, updateAdminUserStatus
 } from "@/utils/api.js";
 import AdminUserDevices from "@/components/admin/AdminUserDevices.jsx";
@@ -112,6 +112,18 @@ const ALL_AVAILABLE_PLANS = [
   { key: "premium", displayName: "Premium" },
 ];
 
+const VOD_MANAGEMENT_TABS = [
+    { value: 'manage_vod', label: 'Gestionar VOD', tipo: '' },
+    { value: 'manage_series', label: 'Gestionar Series', tipo: 'serie' },
+    { value: 'manage_movies', label: 'Películas', tipo: 'pelicula' },
+{ value: 'manage_animes', label: 'Animes', tipo: 'anime' },
+{ value: 'manage_doramas', label: 'Doramas', tipo: 'dorama' },
+{ value: 'manage_novelas', label: 'Novelas', tipo: 'novela' },
+{ value: 'manage_documentales', label: 'Documentales', tipo: 'documental' },
+    // Puedes añadir más aquí en el futuro si quieres más pestañas
+    // { value: 'manage_animes', label: 'Gestionar Animes', tipo: 'anime' },
+];
+
 export default function AdminPanel() {
   const VODS_PER_PAGE = 50;
   const { user } = useAuth();
@@ -139,6 +151,7 @@ export default function AdminPanel() {
     subcategoria: "Netflix"
   });
 
+
   const [channels, setChannels] = useState([]);
   const [videos, setVideos] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -152,7 +165,8 @@ export default function AdminPanel() {
   const [bulkVodFileNameDisplay, setBulkVodFileNameDisplay] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState("");
-
+  const [numChaptersInput, setNumChaptersInput] = useState(0);
+  
   const clearMessages = useCallback(() => { setErrorMsg(""); setSuccessMsg(""); }, []);
 
   // --- Lógica para carga masiva de VODs ---
@@ -300,13 +314,7 @@ export default function AdminPanel() {
   const [vodTotalCount, setVodTotalCount] = useState(0);
   const [vodSearchTerm, setVodSearchTerm] = useState("");
     const [vodFilterTipo, setVodFilterTipo] = useState("");
-    const fetchVideosList = useCallback(
-
-     async (
-      requestedPage = vodCurrentPage,
-      search = vodSearchTerm,
-      tipo = vodFilterTipo
-    ) => {
+    const fetchVideosList = useCallback(async (requestedPage = 1, search = '', tipo = '') => {
       setIsLoading(prev => ({ ...prev, vod: true }));
       clearMessages();
       try {
@@ -314,34 +322,44 @@ export default function AdminPanel() {
         const params = { view: 'admin', limit: VODS_PER_PAGE };
         params.skip = (pageNum - 1) * VODS_PER_PAGE;
         if (search.trim()) params.search = search.trim();
-        if (tipo) params.tipo = tipo;
+        
+        // Si hay un filtro de tipo específico, aplicarlo
+        if (tipo) {
+          params.tipo = tipo;
+        }
+        // Removemos la exclusión automática de series para mostrar todo el contenido
+
+        console.log('Parámetros enviados al backend:', params);
         const response = await axiosInstance.get('/api/videos', { params });
         const data = response.data;
         console.log('Respuesta del backend:', data);
-
+ 
         setVideos(Array.isArray(data.videos) ? data.videos : []);
         setVodCurrentPage(pageNum);
-
+ 
         const totalCount = data.total || 0;
         const calculatedPages = Math.ceil(totalCount / VODS_PER_PAGE);
         setVodTotalCount(totalCount);
         setVodTotalPages(calculatedPages);
-
+ 
         if (!data.videos || data.videos.length === 0) {
           setSuccessMsg('No se encontraron VODs con los criterios actuales.');
+        } else {
+          setSuccessMsg(''); // Limpiar mensaje si hay datos
         }
       } catch (err) {
+        console.error('Error al cargar VODs:', err);
         setErrorMsg(err.response?.data?.message || err.message || 'Fallo al cargar VODs.');
         setVideos([]);
         setVodTotalPages(1);
         setVodTotalCount(0);
       } finally {
         setIsLoading(prev => ({ ...prev, vod: false }));
-     }
-     },
+      }
+    },
     [vodSearchTerm, vodFilterTipo, clearMessages]
   );
-  
+
   const clearVodForm = useCallback(() => { 
     setVodId(null); 
     setVodForm({ 
@@ -384,7 +402,7 @@ export default function AdminPanel() {
       mainSection: video.mainSection || MAIN_SECTION_VOD_OPTIONS[0]?.key || "", 
       genres: Array.isArray(video.genres) ? video.genres.join(", ") : (video.genres || ""), 
       requiresPlan: plansForForm.filter(p => ALL_AVAILABLE_PLANS.some(ap => ap.key === p)),
-      chapters: video.chapters || [],
+      chapters: Array.isArray(video.chapters) ? video.chapters : [], // Asegurar que chapters sea siempre un array
       subcategoria: video.subcategoria || "Netflix"
     }); 
     setActiveTab("add_vod"); 
@@ -430,8 +448,14 @@ export default function AdminPanel() {
         tipo: vodForm.tipo.toLowerCase(),
         genres: vodForm.genres.split(',').map(g => g.trim()).filter(g => g), 
         requiresPlan: plansToSend,
-        subcategoria: vodForm.tipo === "serie" ? vodForm.subcategoria : undefined,
-        chapters: vodForm.tipo !== "pelicula" ? vodForm.chapters : undefined
+        subcategoria: (vodForm.tipo === "serie" || vodForm.tipo === "anime" || vodForm.tipo === "dorama" || vodForm.tipo === "novela" || vodForm.tipo === "documental") ? vodForm.subcategoria : undefined, // Asegurar que subcategoría se envía para todos los tipos con capítulos
+        chapters: (vodForm.tipo !== "pelicula" && vodForm.chapters && vodForm.chapters.length > 0) ? vodForm.chapters.map(ch => ({ // Asegurar que solo se envían capítulos si existen y el tipo no es película
+          title: ch.title || `Capítulo ${vodForm.chapters.indexOf(ch) + 1}`, // Título por defecto si está vacío
+          url: ch.url || '', // URL por defecto si está vacía
+          thumbnail: ch.thumbnail || '',
+          duration: ch.duration || '0:00',
+          description: ch.description || ''
+        })) : undefined // Enviar undefined si no hay capítulos o es película
       }; 
       
       console.log("AdminPanel: Enviando dataToSend (VOD) al backend:", JSON.stringify(dataToSend, null, 2)); 
@@ -488,21 +512,37 @@ export default function AdminPanel() {
   };
   // --- FIN LÓGICA USUARIOS ---
 
-  useEffect(() => {
+ useEffect(() => {
     if (user?.token && user?.role === 'admin') {
-      clearMessages();
-      if (activeTab === "manage_channels" || activeTab === "m3u_to_channels") {
-        fetchChannelsList();
-      } else if (activeTab === "manage_vod") {
-        fetchVideosList();
-      } else if (activeTab === "manage_users") { // Cargar usuarios cuando la pestaña está activa
-        fetchAdminUsersList();
-      }
-      // Limpiar formularios si no se está editando al cambiar a la pestaña de agregar
-      if (activeTab === "add_channel" && !channelId) clearChannelForm();
-      if (activeTab === "add_vod" && !vodId) clearVodForm();
+        clearMessages();
+
+        const vodTabInfo = VOD_MANAGEMENT_TABS.find(tab => tab.value === activeTab);
+
+        if (vodTabInfo) {
+            // Si la pestaña activa es para gestionar VODs (Todos, Series, etc.)
+            const tipoParaFiltrar = vodTabInfo.tipo;
+            setVodFilterTipo(tipoParaFiltrar); // Sincroniza el estado del filtro
+            fetchVideosList(1, '', tipoParaFiltrar);
+        } else if (activeTab === "manage_channels" || activeTab === "m3u_to_channels") {
+            fetchChannelsList();
+        } else if (activeTab === "manage_users") {
+            fetchAdminUsersList();
+        }
+
+        // Limpiar formularios al cambiar a la pestaña de agregar
+        if (activeTab === "add_channel" && !channelId) clearChannelForm();
+        if (activeTab === "add_vod" && !vodId) clearVodForm();
     }
-  }, [activeTab, user?.token, user?.role, fetchChannelsList, fetchVideosList, fetchAdminUsersList, clearChannelForm, clearVodForm, channelId, vodId, clearMessages]);
+}, [activeTab, user?.token, user?.role]); // Quitamos las funciones de las dependencias para evitar loops
+
+  // Effect for updating numChaptersInput when chapters change
+  useEffect(() => {
+     if (vodForm?.chapters?.length > 0) {
+    setNumChaptersInput(vodForm.chapters.length);
+  } else {
+    setNumChaptersInput(0);
+  }
+}, [vodForm.chapters]);
 
   if (!user?.token || user?.role !== "admin") { return <div className="flex justify-center items-center min-h-screen"><p className="text-xl text-red-500">Acceso denegado. Debes ser administrador.</p></div>; }
 
@@ -516,13 +556,19 @@ export default function AdminPanel() {
       </div>
 
       <div className="flex flex-wrap justify-center border-b border-gray-700 mb-6">
-        <Tab label="Subir M3U" value="m3u_to_channels" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label={channelId ? "Editar Canal" : "Agregar Canal"} value="add_channel" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label="Gestionar Canales" value="manage_channels" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label={vodId ? "Editar VOD" : "Agregar VOD"} value="add_vod" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label="Gestionar VOD" value="manage_vod" activeTab={activeTab} onTabChange={setActiveTab} />
-        <Tab label="Carga Masiva VOD" value="bulk_vod_upload" activeTab={activeTab} onTabChange={setActiveTab} />
         <Tab label="Gestionar Usuarios" value="manage_users" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label={vodId ? "Editar VOD" : "Agregar VOD"} value="add_vod" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Todos los VODs" value="manage_vod" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Películas" value="manage_movies" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Series" value="manage_series" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Animes" value="manage_animes" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Doramas" value="manage_doramas" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Novelas" value="manage_novelas" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Documentales" value="manage_documentales" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Carga Masiva VOD" value="bulk_vod_upload" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Gestionar Canales" value="manage_channels" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label="Subir M3U Canales" value="m3u_to_channels" activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tab label={channelId ? "Editar Canal" : "Agregar Canal"} value="add_channel" activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
       {/* Pestaña: Subir M3U */}
@@ -555,35 +601,31 @@ export default function AdminPanel() {
           <div className="flex items-center space-x-4">
             <Input 
               type="number" 
-              min="1"
-              placeholder="Número de capítulos" 
-              value={vodForm.chapters?.length || 0}
-              onChange={(e) => {
-                const numChapters = parseInt(e.target.value) || 0;
-                const currentChapters = vodForm.chapters || [];
-                const newChapters = [...currentChapters];
-                
-                // Add or remove chapters as needed
-                if (numChapters > currentChapters.length) {
-                  // Add new chapters
-                  for (let i = currentChapters.length; i < numChapters; i++) {
-                    newChapters.push({
-                      title: `Capítulo ${i + 1}`,
-                      url: '',
-                      thumbnail: '',
-                      duration: '0:00',
-                      description: ''
-                    });
-                  }
-                } else if (numChapters < currentChapters.length) {
-                  // Remove excess chapters
-                  newChapters.splice(numChapters);
-                }
-                
-                setVodForm(prev => ({ ...prev, chapters: newChapters }));
-              }}
-              className="w-48"
-            />
+  min="1"
+  placeholder="Número de capítulos"
+  value={numChaptersInput}
+  onChange={(e) => {
+    const num = parseInt(e.target.value) || 0;
+    setNumChaptersInput(num);
+    const current = vodForm.chapters || [];
+    const updated = [...current];
+    if (num > current.length) {
+      for (let i = current.length; i < num; i++) {
+        updated.push({
+          title: `Capítulo ${i + 1}`,
+          url: '',
+          thumbnail: '',
+          duration: '0:00',
+          description: ''
+        });
+      }
+    } else if (num < current.length) {
+      updated.splice(num);
+    }
+    setVodForm(prev => ({ ...prev, chapters: updated }));
+  }}
+  className="w-48"
+/>
           </div>
           
           {(vodForm.chapters || []).map((chapter, index) => (
@@ -645,17 +687,20 @@ export default function AdminPanel() {
         </div>
       )}
       {vodForm.tipo !== "pelicula" && (
-        <Select name="subcategoria" value={vodForm.subcategoria} onChange={handleVodFormChange}>
-  <option value="Netflix">Netflix</option>
-  <option value="Prime Video">Prime Video</option>
-  <option value="Disney">Disney</option>
-  <option value="Apple TV">Apple TV</option>
-  <option value="Hulu y Otros">Hulu y Otros</option>
-  <option value="Retro">Retro</option>
-  <option value="Animadas">Animadas</option>
-  <option value="ZONA KIDS">ZONA KIDS</option>
-</Select>
-
+        <>
+          {(vodForm.tipo === "serie") && (
+            <Select name="subcategoria" value={vodForm.subcategoria} onChange={handleVodFormChange}>
+              <option value="Netflix">Netflix</option>
+              <option value="Prime Video">Prime Video</option>
+              <option value="Disney">Disney</option>
+              <option value="Apple TV">Apple TV</option>
+              <option value="Hulu y Otros">Hulu y Otros</option>
+              <option value="Retro">Retro</option>
+              <option value="Animadas">Animadas</option>
+              <option value="ZONA KIDS">ZONA KIDS</option>
+            </Select>
+          )}
+        </>
       )}
       <Input name="logo" type="url" placeholder="URL del Poster/Logo (vertical)" value={vodForm.logo} onChange={handleVodFormChange} />
       <Textarea name="description" placeholder="Descripción/Sinopsis" value={vodForm.description} onChange={handleVodFormChange} />
@@ -700,103 +745,126 @@ export default function AdminPanel() {
   </section>
 )}
 
-{/* Pestaña: Gestionar VODs */}
-<form
-  onSubmit={e => {
-    e.preventDefault();
-    setVodCurrentPage(1);
-        fetchVideosList(1, vodSearchTerm, vodFilterTipo);
-}}
-  className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4"
->
-  <Input
-    type="text"
-    placeholder="Buscar VOD..."
-    value={vodSearchTerm}
-    onChange={e => setVodSearchTerm(e.target.value)}
-    className="w-full sm:max-w-xs"
-  />
-   <Select
-    value={vodFilterTipo}
-    onChange={e => setVodFilterTipo(e.target.value)}
-    className="w-full sm:max-w-xs"
-  >
-    <option value="">Todos</option>
-    <option value="pelicula">Película</option>
-    <option value="serie">Serie</option>
-    <option value="anime">Anime</option>
-    <option value="dorama">Dorama</option>
-    <option value="novela">Novela</option>
-    <option value="documental">Documental</option>
-  </Select>
-  <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-    Buscar
-  </Button>
-</form>
+      {/* Pestaña: Gestionar VODs */}
+      {/* --- INICIO: Bloque Unificado para Gestionar VODs --- */}
+{VOD_MANAGEMENT_TABS.some(t => t.value === activeTab) && (
+  <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl">
+    <h2 className="text-2xl font-semibold mb-4 px-4 pt-4 sm:px-0 sm:pt-0">
+      {VOD_MANAGEMENT_TABS.find(t => t.value === activeTab)?.label || 'Gestionar Contenido'}
+    </h2>
 
-{/* Paginación */}
-{vodTotalPages > 1 && (
-  <div className="flex justify-center space-x-2 my-4">
-    {Array.from({ length: vodTotalPages }, (_, idx) => idx + 1).map(num => (
-      <button
-        key={num}
-        onClick={() => {
-          setVodCurrentPage(num);
-         fetchVideosList(num, vodSearchTerm, vodFilterTipo);
-       }}
-        className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
-      >
-        {num}
-      </button>
-    ))}
-  </div>
-)}
-{vodTotalCount > 0 && (
-  <p className="text-sm text-gray-400 text-center sm:text-left px-4">Mostrando {videos.length} de {vodTotalCount} VODs totales</p>
-)}
-      {activeTab === "manage_vod" && ( <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl"> <h2 className="text-2xl font-semibold mb-4 px-4 pt-4 sm:px-0 sm:pt-0">Gestionar VODs Existentes</h2> {isLoading.vod ? <div className="text-center py-10 text-gray-400">Cargando VODs...</div> : videos && videos.length > 0 ? ( <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar"> {videos.map(vid => ( <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 hover:bg-gray-600/80 transition-colors rounded-md gap-3"> <img src={vid.logo || vid.thumbnail || '/img/placeholder-thumbnail.png'} alt={vid.title || 'logo'} className="w-16 h-24 object-cover bg-black rounded-sm mr-0 sm:mr-3 flex-shrink-0 self-center sm:self-start border border-gray-600" onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}/> <div className="flex-grow mb-2 sm:mb-0 text-sm min-w-0 text-center sm:text-left"> <strong className={`text-base block truncate ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`} title={vid.title || "Sin Título"}>{vid.title || "Sin Título"} <span className="text-xs text-gray-400">({vid.tipo || 'N/A'})</span></strong> <p className="text-xs text-gray-400 truncate" title={vid.url}>{vid.url}</p> <p className="text-xs text-gray-500">Sección VOD: <span className="text-gray-400">{MAIN_SECTION_VOD_OPTIONS.find(s=>s.key === vid.mainSection)?.displayName || vid.mainSection || 'N/A'}</span></p> <p className="text-xs text-gray-500"> Planes VOD: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span> </p> <p className="text-xs text-gray-500">Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span></p> <p className="text-xs text-gray-500">{vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}</p> </div> <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 flex-shrink-0 self-center sm:self-auto w-full sm:w-auto justify-around sm:justify-start"> <Button onClick={() => handleEditVodClick(vid)} className="flex-1 sm:flex-none bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1.5">Editar</Button> <Button onClick={() => handleDeleteVodClick(vid.id || vid._id, vid.title)} isLoading={isSubmitting} className="flex-1 sm:flex-none bg-red-500 hover:bg-red-400 text-xs px-3 py-1.5">Eliminar</Button> </div> </div> ))} </div> ) : <p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay VODs para mostrar." : ""}</p>} </section> )}{/* Paginación al final de la lista de VODs */}
-{vodTotalPages > 1 && (
-  <div className="flex justify-center flex-wrap gap-2 mt-6">
-    <button
-      onClick={() => {
-        if (vodCurrentPage > 1) {
-          setVodCurrentPage(prev => prev - 1);
-          fetchVideosList(vodCurrentPage - 1, vodSearchTerm, vodFilterTipo);
-        }
+    <form
+      onSubmit={e => {
+        e.preventDefault();
+        const currentTab = VOD_MANAGEMENT_TABS.find(t => t.value === activeTab);
+        setVodCurrentPage(1);
+        fetchVideosList(1, vodSearchTerm, currentTab?.tipo || vodFilterTipo);
       }}
-      disabled={vodCurrentPage === 1}
-      className={`px-3 py-1.5 rounded-md text-sm font-semibold ${vodCurrentPage === 1 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+      className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4 mb-6"
     >
-      ◀ Anterior
-    </button>
+      <Input
+        type="text"
+        placeholder={`Buscar en ${VOD_MANAGEMENT_TABS.find(t => t.value === activeTab)?.label || 'VODs'}...`}
+        value={vodSearchTerm}
+        onChange={e => setVodSearchTerm(e.target.value)}
+        className="w-full sm:max-w-xs"
+      />
 
-    {Array.from({ length: vodTotalPages }, (_, idx) => idx + 1).map(num => (
-      <button
-        key={num}
-        onClick={() => {
-          setVodCurrentPage(num);
-          fetchVideosList(num, vodSearchTerm, vodFilterTipo);
-        }}
-        className={`px-3 py-1.5 rounded-md text-sm font-semibold ${num === vodCurrentPage ? 'bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}
-      >
-        {num}
-      </button>
-    ))}
+      {/* El filtro por tipo solo aparece en la pestaña "Todos los VODs" */}
+      {activeTab === 'manage_vod' && (
+        <Select
+          value={vodFilterTipo}
+          onChange={e => setVodFilterTipo(e.target.value)}
+          className="w-full sm:max-w-xs"
+        >
+          <option value="">Todos los Tipos</option>
+          <option value="pelicula">Película</option>
+          <option value="serie">Serie</option>
+          <option value="anime">Anime</option>
+          <option value="dorama">Dorama</option>
+          <option value="novela">Novela</option>
+          <option value="documental">Documental</option>
+        </Select>
+      )}
 
-    <button
-      onClick={() => {
-        if (vodCurrentPage < vodTotalPages) {
-          setVodCurrentPage(prev => prev + 1);
-          fetchVideosList(vodCurrentPage + 1, vodSearchTerm, vodFilterTipo);
-        }
-      }}
-      disabled={vodCurrentPage === vodTotalPages}
-      className={`px-3 py-1.5 rounded-md text-sm font-semibold ${vodCurrentPage === vodTotalPages ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
-    >
-      Siguiente ▶
-    </button>
-  </div>
+      <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+        Buscar
+      </Button>
+    </form>
+
+    {/* El resto de la lógica de paginación y lista de videos se mantiene igual */}
+    {vodTotalCount > 0 && (
+      <p className="text-sm text-gray-400 text-center sm:text-left px-4 mb-4">
+        Mostrando {videos.length} de {vodTotalCount} VODs totales
+      </p>
+    )}
+
+    {isLoading.vod ? (
+      <div className="text-center py-10 text-gray-400">Cargando...</div>
+    ) : videos && videos.length > 0 ? (
+      <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
+        {videos.map(vid => (
+          <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 hover:bg-gray-600/80 transition-colors rounded-md gap-3">
+            <img 
+              src={vid.logo || vid.thumbnail || '/img/placeholder-thumbnail.png'} 
+              alt={vid.title || 'logo'} 
+              className="w-16 h-24 object-cover bg-black rounded-sm mr-0 sm:mr-3 flex-shrink-0 self-center sm:self-start border border-gray-600" 
+              onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}
+            />
+            <div className="flex-grow mb-2 sm:mb-0 text-sm min-w-0 text-center sm:text-left">
+              <strong className={`text-base block truncate ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`} title={vid.title || "Sin Título"}>
+                {vid.title || "Sin Título"}
+              </strong>
+              <p className="text-xs text-gray-500">
+                Tipo: <span className="text-gray-400">{vid.tipo || 'N/A'}</span>
+              </p>
+              {vid.tipo !== "pelicula" && (
+                <p className="text-xs text-gray-500">
+                  Capítulos: <span className="text-gray-400">{vid.chapters?.length || 0}</span>
+                </p>
+              )}
+              {vid.subcategoria && (
+                <p className="text-xs text-gray-500">
+                  Subcategoría: <span className="text-gray-400">{vid.subcategoria}</span>
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Planes: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span>
+              </p>
+              <p className="text-xs text-gray-500">
+                Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span>
+              </p>
+              <p className="text-xs text-gray-500">
+                {vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}
+              </p>
+            </div>
+            <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 flex-shrink-0 self-center sm:self-auto w-full sm:w-auto justify-around sm:justify-start">
+              <Button 
+                onClick={() => handleEditVodClick(vid)} 
+                className="flex-1 sm:flex-none bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1.5"
+              >
+                Editar
+              </Button>
+              <Button 
+                onClick={() => handleDeleteVodClick(vid.id || vid._id, vid.title)} 
+                isLoading={isSubmitting} 
+                className="flex-1 sm:flex-none bg-red-500 hover:bg-red-400 text-xs px-3 py-1.5"
+              >
+                Eliminar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-gray-400 text-center py-10">
+        {!errorMsg ? "No hay contenido para mostrar." : ""}
+      </p>
+    )}
+  </section>
 )}
+{/* --- FIN: Bloque Unificado para Gestionar VODs --- */}
+
 
 
       {/* --- PESTAÑA: GESTIONAR USUARIOS --- */}
@@ -848,6 +916,111 @@ export default function AdminPanel() {
       )}
     </section>
   )}
+      {/* Pestaña: Gestionar Series */}
+      {activeTab === "manage_series" && (
+        <section className="p-1 sm:p-6 bg-gray-800 rounded-lg shadow-xl">
+          <h2 className="text-2xl font-semibold mb-4 px-4 pt-4 sm:px-0 sm:pt-0">Gestionar Series</h2>
+          
+          {/* Formulario de búsqueda y filtros */}
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              setVodCurrentPage(1);
+              fetchVideosList(1, vodSearchTerm, "serie");
+            }}
+            className="flex flex-col sm:flex-row gap-4 items-center justify-between px-4 mb-6"
+          >
+            <Input
+              type="text"
+              placeholder="Buscar serie..."
+              value={vodSearchTerm}
+              onChange={e => setVodSearchTerm(e.target.value)}
+              className="w-full sm:max-w-xs"
+            />
+            <Select
+              value={vodFilterTipo}
+              onChange={e => setVodFilterTipo(e.target.value)}
+              className="w-full sm:max-w-xs"
+            >
+              <option value="serie">Todas las Series</option>
+              <option value="Netflix">Netflix</option>
+              <option value="Prime Video">Prime Video</option>
+              <option value="Disney">Disney</option>
+              <option value="Apple TV">Apple TV</option>
+              <option value="Hulu y Otros">Hulu y Otros</option>
+              <option value="Retro">Retro</option>
+              <option value="Animadas">Animadas</option>
+              <option value="ZONA KIDS">ZONA KIDS</option>
+            </Select>
+            <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+              Buscar
+            </Button>
+          </form>
+
+          {/* Información de resultados */}
+          {vodTotalCount > 0 && (
+            <p className="text-sm text-gray-400 text-center sm:text-left px-4 mb-4">
+              Mostrando {videos.length} de {vodTotalCount} series totales
+            </p>
+          )}
+
+      {/* Lista de Series */}
+          {isLoading.vod ? (
+            <div className="text-center py-10 text-gray-400">Cargando series...</div>
+          ) : videos && videos.length > 0 ? (
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
+              {videos.map(vid => (
+                <div key={vid.id || vid._id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-700 hover:bg-gray-600/80 transition-colors rounded-md gap-3">
+                  <img 
+                    src={vid.logo || vid.thumbnail || '/img/placeholder-thumbnail.png'} 
+                    alt={vid.title || 'logo'} 
+                    className="w-16 h-24 object-cover bg-black rounded-sm mr-0 sm:mr-3 flex-shrink-0 self-center sm:self-start border border-gray-600" 
+                    onError={(e) => {e.currentTarget.src = '/img/placeholder-thumbnail.png';}}
+                  />
+                  <div className="flex-grow mb-2 sm:mb-0 text-sm min-w-0 text-center sm:text-left">
+                    <strong className={`text-base block truncate ${!vid.active ? 'text-gray-500 line-through' : 'text-white'}`} title={vid.title || "Sin Título"}>
+                      {vid.title || "Sin Título"}
+                    </strong>
+                    <p className="text-xs text-gray-500">
+                      Subcategoría: <span className="text-gray-400">{vid.subcategoria || 'N/A'}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Capítulos: <span className="text-gray-400">{vid.chapters?.length || 0}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Planes: <span className="text-gray-400">{(Array.isArray(vid.requiresPlan) ? vid.requiresPlan : [vid.requiresPlan]).map(pKey => ALL_AVAILABLE_PLANS.find(p => p.key === (pKey === "basico" ? "gplay" : pKey))?.displayName || pKey).join(', ') || 'N/A'}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Géneros: <span className="text-gray-400">{Array.isArray(vid.genres) ? vid.genres.join(', ') : (vid.genres || 'N/A')}</span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {vid.active ? "Activo" : "Inactivo"} | {vid.isFeatured ? "Destacado" : "No Dest."}
+                    </p>
+                  </div>
+                  <div className="flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2 flex-shrink-0 self-center sm:self-auto w-full sm:w-auto justify-around sm:justify-start">
+                    <Button 
+                      onClick={() => handleEditVodClick(vid)} 
+                      className="flex-1 sm:flex-none bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-3 py-1.5"
+                    >
+                      Editar
+                    </Button>
+                    <Button 
+                      onClick={() => handleDeleteVodClick(vid.id || vid._id, vid.title)} 
+                      isLoading={isSubmitting} 
+                      className="flex-1 sm:flex-none bg-red-500 hover:bg-red-400 text-xs px-3 py-1.5"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 text-center py-10">{!errorMsg ? "No hay series para mostrar." : ""}</p>
+          )}
+        </section>
+      )}
+
       {/* --- FIN PESTAÑA USUARIOS --- */}
 
       {/* Pestaña: Carga Masiva VOD */}

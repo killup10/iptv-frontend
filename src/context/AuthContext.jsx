@@ -40,43 +40,41 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // userDataFromBackend se espera que sea { token: "...", user: { username: "...", role: "...", plan: "..." } }
-  // tal como lo devuelve tu backend en /api/auth/login
-  const login = (userDataFromBackend) => {
-    console.log("AuthContext: login() llamado con:", userDataFromBackend); 
-    
-    if (
-      !userDataFromBackend ||
-      !userDataFromBackend.token ||
-      !userDataFromBackend.user ||
-      !userDataFromBackend.user.username ||
-      typeof userDataFromBackend.user.role === 'undefined' ||
-      typeof userDataFromBackend.user.plan === 'undefined' // Verificación explícita para plan
-    ) {
-      console.error(
-        "AuthContext: Intento de login con datos incompletos. Se esperaba {token, user:{username,role,plan}}", 
-        userDataFromBackend
-      );
-      // Podrías lanzar un error o manejarlo de otra forma
-      return Promise.reject(new Error("Datos de login incompletos desde el backend."));
+  const login = async (credentials) => {
+    try {
+      const { login: loginService } = await import('../utils/AuthService.js');
+      const userDataFromBackend = await loginService(credentials.username, credentials.password);
+
+      if (!userDataFromBackend?.token || !userDataFromBackend?.user?.username) {
+        console.error(
+          "AuthContext: Datos de login incompletos desde el backend.",
+          userDataFromBackend
+        );
+        throw new Error("Error de autenticación: datos de respuesta inválidos");
+      }
+
+      const userToStoreInLocalStorage = {
+        username: userDataFromBackend.user.username,
+        role: userDataFromBackend.user.role,
+        plan: userDataFromBackend.user.plan,
+      };
+
+      // Guardar datos en localStorage
+      localStorage.setItem("token", userDataFromBackend.token);
+      localStorage.setItem("user", JSON.stringify(userToStoreInLocalStorage));
+
+      const userForState = {
+        ...userToStoreInLocalStorage,
+        token: userDataFromBackend.token,
+      };
+      setUser(userForState);
+      console.log("AuthContext: Usuario logueado y estado establecido:", userForState);
+      return userForState;
+    } catch (error) {
+      console.error("AuthContext: Error en el proceso de login:", error);
+      // Re-lanzamos el error para que el componente que llama a login (Home.jsx) pueda manejarlo
+      throw error;
     }
-
-    const userToStoreInLocalStorage = { // Solo la parte 'user' del backend
-      username: userDataFromBackend.user.username,
-      role: userDataFromBackend.user.role,
-      plan: userDataFromBackend.user.plan 
-    };
-
-    localStorage.setItem("user", JSON.stringify(userToStoreInLocalStorage));
-    localStorage.setItem("token", userDataFromBackend.token);
-
-    const userForState = { // El objeto completo para el estado, incluyendo el token
-      ...userToStoreInLocalStorage,
-      token: userDataFromBackend.token
-    };
-    setUser(userForState);
-    console.log("AuthContext: Usuario logueado y estado establecido:", userForState);
-    return Promise.resolve(userForState); // Devuelve el usuario para posible encadenamiento
   };
 
   const logout = async (allDevices = false) => {
