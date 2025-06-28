@@ -18,17 +18,26 @@ export default function Carousel({ title, items = [], onItemClick, itemType = 'i
         aria-label={`Carrusel de ${title}`}
       >
          {items.map((item) => {
-          const progressPercent =
-            typeof item.progressTime === 'number' && item.duration
-              ? (item.progressTime / item.duration) * 100
-              : undefined;
+          // Calcular progreso para "Continuar viendo"
+          let progressPercent = undefined;
+          
+          if (item.watchProgress?.lastTime && item.watchProgress?.duration) {
+            progressPercent = (item.watchProgress.lastTime / item.watchProgress.duration) * 100;
+          } else if (typeof item.progressTime === 'number' && item.duration) {
+            progressPercent = (item.progressTime / item.duration) * 100;
+          }
+          
+          // Asegurar que el progreso esté entre 0 y 100
+          if (progressPercent !== undefined) {
+            progressPercent = Math.max(0, Math.min(100, progressPercent));
+          }
 
           return (
             <Card
               key={item.id || item._id}
               item={item}
               onClick={onItemClick}
-              itemType={itemType}
+              itemType={typeof itemType === 'function' ? itemType(item) : itemType}
               onPlayTrailer={onPlayTrailerClick} // Pasa la prop onPlayTrailerClick a Card (Card la espera como onPlayTrailer)
               progressPercent={progressPercent}
             />

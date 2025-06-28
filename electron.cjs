@@ -11,28 +11,46 @@ let mpvIpcSocket = null;
 async function forceKillMpv() {
   return new Promise(resolve => {
     if (!mpvProcess) {
+      console.log('[MPV] No hay proceso MPV para detener');
       return resolve();
     }
+    
+    console.log('[MPV] Iniciando proceso de cierre forzado...');
     const cleanup = () => {
       if (mpvIpcSocket) {
         mpvIpcSocket.destroy();
         mpvIpcSocket = null;
       }
       mpvProcess = null;
+      console.log('[MPV] Proceso MPV limpiado correctamente');
       resolve();
     };
-    mpvProcess.once('exit', cleanup);
+    
+    // Configurar timeout de respaldo
+    const forceTimeout = setTimeout(() => {
+      console.log('[MPV] Timeout alcanzado, forzando limpieza');
+      cleanup();
+    }, 2000); // 2 segundos máximo
+    
+    mpvProcess.once('exit', (code) => {
+      console.log(`[MPV] Proceso terminado con código: ${code}`);
+      clearTimeout(forceTimeout);
+      cleanup();
+    });
+    
     try {
       if (process.platform === 'win32') {
+        console.log('[MPV] Usando taskkill para Windows...');
         spawn('taskkill', ['/pid', mpvProcess.pid.toString(), '/f', '/t']);
       } else {
+        console.log('[MPV] Usando SIGKILL para Unix...');
         mpvProcess.kill('SIGKILL');
       }
     } catch (err) {
       console.error('[MPV] Error al forzar cierre:', err);
+      clearTimeout(forceTimeout);
       cleanup();
     }
-    setTimeout(cleanup, 1000); // Respaldo por si no se emite 'exit'
   });
 }
 const isDev = process.env.NODE_ENV === 'development';
@@ -238,6 +256,9 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
           }
         });
 
+        // Variable para capturar el último error
+        let lastError = '';
+
         // Esperar a que MPV esté listo y capturar salida
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
@@ -291,12 +312,6 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
             clearTimeout(timeout);
             reject(new Error(errorMsg));
           });
-
-          // Capturar salida para logs
-          mpvProcess.stdout.on('data', (data) => {
-            console.log('[MPV stdout]:', data.toString());
-          });
-
           mpvProcess.stderr.on('data', (data) => {
             const error = data.toString();
             
@@ -307,6 +322,9 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
                 error.includes('[cplayer] ')) {
               return;
             }
+
+            // Guardar el último error para diagnóstico
+            lastError = error;
 
             // Detectar errores críticos
             const criticalErrors = [
@@ -324,7 +342,10 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
               'no video',
               'no demuxer',
               'no decoder',
-              'playback error'
+              'playback error',
+              'failed to get stream',
+              'failed to parse',
+              'failed to read'
             ];
 
             if (criticalErrors.some(e => error.toLowerCase().includes(e))) {
@@ -334,6 +355,11 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
             } else {
               console.error('[MPV stderr]:', error);
             }
+          });
+
+          // Capturar salida para logs y diagnóstico
+          mpvProcess.stdout.on('data', (data) => {
+            console.log('[MPV stdout]:', data.toString());
           });
         });
 
@@ -350,18 +376,32 @@ ipcMain.handle('mpv-embed-play', async (_, { url, bounds }) => {
           sendMpvError(errorMsg);
         });
 
-        mpvProcess.on('exit', (code) => {
-          const exitMsg = code ? `MPV se cerró con código: ${code}` : 'MPV se cerró normalmente';
-          console.log('[MPV Exit]:', exitMsg);
-          if (code !== 0) {
-            sendMpvError(exitMsg);
-          }
-          if (mpvIpcSocket) {
-            mpvIpcSocket.destroy();
-            mpvIpcSocket = null;
-          }
-          mpvProcess = null;
-        });
+          // Manejador de salida del proceso
+          mpvProcess.on('exit', (code, signal) => {
+            let exitMsg = '';
+            if (code === 1) {
+              // Incluir el último error conocido en el mensaje
+              exitMsg = `MPV no pudo reproducir el contenido. ${lastError ? 'Error: ' + lastError.trim() : 'Verifique la URL o el formato del video.'}`;
+            } else if (code === null && signal) {
+              exitMsg = `MPV fue terminado por la señal: ${signal}`;
+            } else if (code !== 0) {
+              exitMsg = `MPV se cerró con código: ${code}`;
+            } else {
+              exitMsg = 'MPV se cerró normalmente';
+            }
+            
+            console.log('[MPV Exit]:', exitMsg, { code, signal, lastError });
+            
+            if (code !== 0) {
+              sendMpvError(exitMsg);
+            }
+            
+            if (mpvIpcSocket) {
+              mpvIpcSocket.destroy();
+              mpvIpcSocket = null;
+            }
+            mpvProcess = null;
+          });
       } catch (err) {
         const errorMsg = err.message || 'Error desconocido al inicializar MPV';
         console.error('[MPV Init Error]:', errorMsg);

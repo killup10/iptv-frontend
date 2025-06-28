@@ -11,11 +11,14 @@
     "electron:dev": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-builder --config electron-builder.config.cjs",
     "start": "npm run electron:dev",
-    "package": "npm run electron:build"
-
-
+    "package": "npm run electron:build",
+    "mobile:build": "npm run build && npx cap sync",
+    "mobile:android": "npx cap open android",
+    "mobile:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/ios": "^7.4.0",
     "@heroicons/react": "^2.2.0",
     "axios": "^1.9.0",
     "hls.js": "^1.6.2",
@@ -28,6 +31,7 @@
     "shaka-player": "^4.14.11"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.0",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",

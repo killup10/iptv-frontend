@@ -80,9 +80,15 @@ const TrailerModal = ({ trailerUrl, onClose }) => {
               className="block" // Asegura que el iframe ocupe el espacio
             ></iframe>
           ) : (
-            // Si no es una URL de YouTube, o no se pudo extraer el ID,
-            // intenta reproducir con VideoPlayer (asumiendo que puede manejar otras URLs de tráiler)
-            <VideoPlayer url={trailerUrl} /> 
+            // Si no es una URL de YouTube, usar reproductor HTML5 nativo
+            <video 
+              className="w-full h-full"
+              controls
+              autoPlay
+              src={trailerUrl}
+            >
+              Tu navegador no soporta el elemento de video.
+            </video>
           )}
         </div>
          <p className="text-xs text-gray-600 mt-3 text-center">

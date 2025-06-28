@@ -7,8 +7,8 @@ import {
   fetchFeaturedChannels,
   fetchFeaturedMovies,
   fetchFeaturedSeries,
-  fetchContinueWatching,
 } from '../utils/api.js';
+import { videoProgressService } from '../services/videoProgress.js';
 import TrailerModal from '../components/TrailerModal.jsx';
 
 export function Home() {
@@ -50,7 +50,7 @@ export function Home() {
       setContentError(null);
       try {
         const results = await Promise.allSettled([
-          fetchContinueWatching(),
+          videoProgressService.getContinueWatching(),
           fetchFeaturedChannels(),
           fetchFeaturedMovies(),
           fetchFeaturedSeries(),
@@ -64,6 +64,7 @@ export function Home() {
         ] = results;
 
         if (continueWatchingResult.status === 'fulfilled' && Array.isArray(continueWatchingResult.value)) {
+          console.log('[Home.jsx] Continue watching items loaded:', continueWatchingResult.value);
           setContinueWatchingItems(continueWatchingResult.value);
         } else {
           console.error('[Home.jsx] Error loading "Continue Watching":', continueWatchingResult.reason);
@@ -118,10 +119,19 @@ export function Home() {
 
     const progress = item.watchProgress || {};
     const startTime = progress.lastTime || 0;
+    const lastChapter = progress.lastChapter || 0;
     
     const navigationState = {};
-    if (startTime > 5) {
+    
+    // Para "Continuar viendo", siempre pasar el progreso
+    if (itemTypeFromCarousel === 'continue-watching' || startTime > 5) {
+      navigationState.continueWatching = true;
       navigationState.startTime = startTime;
+      
+      // Si es una serie y tiene capítulos, navegar al último capítulo visto
+      if ((type === 'serie' || type === 'series') && lastChapter !== undefined) {
+        navigationState.chapterIndex = lastChapter;
+      }
     }
     
     navigate(`/watch/${type}/${id}`, { state: navigationState });
@@ -275,8 +285,8 @@ export function Home() {
             <Carousel
               title="Continuar Viendo"
               items={continueWatchingItems}
-              onItemClick={(item) => handleItemClick(item, item.itemType)}
-              itemType="movie"
+              onItemClick={(item) => handleItemClick(item, 'continue-watching')}
+              itemType={item => item.tipo || item.itemType || 'movie'}
             />
           )}
           {featuredChannels.length > 0 && (

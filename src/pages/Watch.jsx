@@ -153,25 +153,52 @@ export function Watch() {
     }
   }, [videoUrl]);
 
-  // 4) Iniciar MPV y SUSCRIBIRSE a eventos de progreso
-  useEffect(() => {
-    const isElectronEnv = typeof window !== "undefined" && window.electronMPV;
-    if (!videoUrl || !bounds || !isElectronEnv) return;
+  // 4) Iniciar MPV y SUSCRIBIRSE a eventos de progreso
+  useEffect(() => {
+    const isElectronEnv = typeof window !== "undefined" && window.electronMPV;
+    if (!videoUrl || !bounds || !isElectronEnv) return;
 
-    if (process.env.NODE_ENV === "development") {
-      console.log('[Watch.jsx] Iniciando MPV con URL:', videoUrl);
-    }
-    
-    window.electronMPV.play(videoUrl, bounds, { startTime })
-      .catch(err => {
+    const initializeMPV = async (retryCount = 0) => {
+      try {
+        // Primero, asegurar que cualquier instancia anterior de MPV esté detenida
+        console.log('[Watch.jsx] Deteniendo MPV anterior antes de iniciar nuevo...');
+        await window.electronMPV.stop();
+        
+        // Pausa más larga para asegurar que MPV se haya cerrado completamente
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (process.env.NODE_ENV === "development") {
+          console.log('[Watch.jsx] Iniciando MPV con URL:', videoUrl);
+        }
+        
+        const result = await window.electronMPV.play(videoUrl, bounds, { startTime });
+        if (!result.success) {
+          throw new Error(result.error || 'Error desconocido al iniciar MPV');
+        }
+
+        // Si llegamos aquí, la reproducción se inició correctamente
+        setError(null);
+        
+      } catch (err) {
         console.error('[Watch.jsx] Error al iniciar MPV:', err);
+        
+        // Si es un error de código 1 y no hemos excedido los reintentos, intentar de nuevo
+        if (err.message.includes('código: 1') && retryCount < 2) {
+          console.log(`[Watch.jsx] Reintentando reproducción (intento ${retryCount + 1})...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return initializeMPV(retryCount + 1);
+        }
+        
         setError(`Error al iniciar el reproductor: ${err.message}`);
-      });
+      }
+    };
 
-    const handleMpvError = (event, message) => {
-      console.error('[Watch.jsx] MPV Error:', message);
-      setError(`Error del reproductor: ${message}`);
-    };
+    initializeMPV();
+
+    const handleMpvError = (event, message) => {
+      console.error('[Watch.jsx] MPV Error:', message);
+      setError(`Error del reproductor: ${message}`);
+    };
 
     // --- LÓGICA PARA ESCUCHAR EL TIEMPO ---
     const handleTimePos = (event, time) => {
@@ -181,25 +208,27 @@ export function Watch() {
         }
     };
     
-    if (window.electronAPI) {
-      console.log('[Watch.jsx] Suscribiendo a eventos MPV (error y time-pos)...');
-      window.electronAPI.on('mpv-error', handleMpvError);
+    if (window.electronAPI) {
+      console.log('[Watch.jsx] Suscribiendo a eventos MPV (error y time-pos)...');
+      window.electronAPI.on('mpv-error', handleMpvError);
       // Suscribirse al evento que notifica la posición del tiempo
       window.electronAPI.on('mpv-time-pos', handleTimePos); 
-    }
+    }
 
-    return () => {
-      console.log('[Watch.jsx] Limpiando recursos MPV...');
-      if (window.electronMPV) {
-        window.electronMPV.stop();
-      }
-      if (window.electronAPI) {
+    return () => {
+      console.log('[Watch.jsx] Limpiando recursos MPV...');
+      if (window.electronMPV) {
+        window.electronMPV.stop().catch(err => {
+          console.error('[Watch.jsx] Error al detener MPV en cleanup:', err);
+        });
+      }
+      if (window.electronAPI) {
         // Limpiar los listeners al desmontar el componente
-        window.electronAPI.removeListener('mpv-error', handleMpvError);
+        window.electronAPI.removeListener('mpv-error', handleMpvError);
         window.electronAPI.removeListener('mpv-time-pos', handleTimePos);
-      }
-    };
-  }, [videoUrl, bounds, startTime, throttledSaveProgress]); // Añadir dependencias
+      }
+    };
+  }, [videoUrl, bounds, startTime, throttledSaveProgress]); // Añadir dependencias
 
   // 5) Suscribirse a petición de sincronización de bounds
   useEffect(() => {
@@ -241,18 +270,32 @@ export function Watch() {
       </div>
     );
 
-  if (error)
-    return (
-      <div className="text-red-500 p-10 text-center min-h-screen bg-black pt-20">
-        {error}
+  // Mostrar error pero mantener el contenido visible
+  const showError = error && (
+    <div className="w-full max-w-screen-xl mx-auto mb-4">
+      <div className="bg-red-500 bg-opacity-10 border border-red-500 text-red-500 p-4 rounded-lg flex items-center justify-between">
+        <span>{error}</span>
         <button
-          onClick={() => navigate(-1)}
-          className="block mx-auto mt-4 bg-gray-700 px-3 py-1 rounded"
+          onClick={() => {
+            setError(null);
+            // Re-intentar reproducción
+            if (window.electronMPV && videoUrl && bounds) {
+              window.electronMPV.stop()
+                .then(() => new Promise(resolve => setTimeout(resolve, 1000)))
+                .then(() => window.electronMPV.play(videoUrl, bounds, { startTime }))
+                .catch(err => {
+                  console.error('[Watch.jsx] Error al reintentar reproducción:', err);
+                  setError(`Error al reintentar: ${err.message}`);
+                });
+            }
+          }}
+          className="ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
         >
-          Volver
+          Reintentar
         </button>
       </div>
-    );
+    </div>
+  );
 
   if (!itemData)
     return (
@@ -288,6 +331,7 @@ export function Watch() {
   return (
     <div className="bg-zinc-900 min-h-screen flex flex-col pt-16">
       <div className="container mx-auto px-2 sm:px-4 py-4 flex-grow flex flex-col">
+        {showError}
         <div className="mb-4 flex items-center justify-between w-full max-w-screen-xl mx-auto">
           <button
             onClick={() => navigate(-1)}
@@ -311,8 +355,8 @@ export function Watch() {
             
             <div
               ref={videoAreaRef}
-              className="w-full mb-6 bg-black"
-              style={{ position: "relative", width: "100%", height: "450px" }}
+              className="w-[70%] mx-auto mb-6 bg-black rounded-lg overflow-hidden"
+              style={{ position: "relative", aspectRatio: "16/9" }}
             >
               <div className="flex items-center justify-center h-full text-white">
                 {!videoUrl && "Cargando video..."}

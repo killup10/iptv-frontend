@@ -17,12 +17,24 @@ const SeriesChapters = ({ chapters, serieId, currentChapter, watchProgress }) =>
   });
 
 
-  const handleChapterClick = (chapterIndex) => {
+  const handleChapterClick = async (chapterIndex) => {
     console.log("[SeriesChapters] Navegando a capítulo:", {
       serieId,
       chapterIndex,
       chapterTitle: chapters[chapterIndex]?.title
     });
+    
+    // Detener MPV antes de navegar si estamos en Electron
+    if (typeof window !== 'undefined' && window.electronMPV) {
+      try {
+        console.log('[SeriesChapters] Deteniendo MPV antes de cambiar capítulo...');
+        await window.electronMPV.stop();
+        // Pequeña pausa para asegurar que MPV se haya cerrado
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err) {
+        console.error('[SeriesChapters] Error al detener MPV:', err);
+      }
+    }
     
     navigate(`/watch/serie/${serieId}`, {
       state: { chapterIndex }

@@ -81,12 +81,17 @@ export default function Card({
         />
 
         {typeof progressPercent === 'number' && progressPercent > 0 && progressPercent < 100 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700/80">
-            <div
-              className="h-full bg-red-600"
-              style={{ width: `${progressPercent}%` }}
-            ></div>
-          </div>
+          <>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700/80">
+              <div
+                className="h-full bg-red-600"
+                style={{ width: `${progressPercent}%` }}
+              ></div>
+            </div>
+            <div className="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded-md font-semibold">
+              {Math.round(progressPercent)}%
+            </div>
+          </>
         )}
 
         {showDetailedOverlay && (
